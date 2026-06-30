@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace ForgeUi;
@@ -68,7 +69,29 @@ sealed class MainForm : Form
     async Task Init()
     {
         await EnsureDaemon();
-        await _web.EnsureCoreWebView2Async();
+        try
+        {
+            // WebView2's default user-data folder sits next to the exe — which is
+            // Program Files after an install, NOT writable by a normal user, so init
+            // would throw. Pin it to %LOCALAPPDATA%\Forge\WebView2 (per-user, writable).
+            var udf = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Forge", "WebView2");
+            Directory.CreateDirectory(udf);
+            var env = await CoreWebView2Environment.CreateAsync(null, udf);
+            await _web.EnsureCoreWebView2Async(env);
+        }
+        catch (Exception ex)
+        {
+            // Most likely: WebView2 Runtime missing. Fail soft with a clear message
+            // instead of the raw .NET crash dialog the user can't act on.
+            MessageBox.Show(
+                "A Forja precisa do runtime do WebView2 (Microsoft Edge) para abrir.\n\n" +
+                "Instale em: https://developer.microsoft.com/microsoft-edge/webview2/\n\n" +
+                "Detalhe: " + ex.Message,
+                "Forge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
         _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
         _web.CoreWebView2.Settings.IsStatusBarEnabled = false;
         _web.CoreWebView2.NavigationCompleted += (_, e) => { if (e.IsSuccess) _webReady.TrySetResult(); };
