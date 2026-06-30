@@ -19,3 +19,7 @@ Thumbs.db
 # Local Forge state (baseline, fix log are per-machine)
 *.forgebaseline
 fix_log*.json
+
+# Installer build output
+installer/dist/
+installer/Output/
