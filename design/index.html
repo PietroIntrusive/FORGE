@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forge — Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --void:#0a0a0b; --anvil:#141416; --steel:#1c1c20; --steel-2:#232328;
+    --edge:#2a2a30; --edge-soft:rgba(255,255,255,.06);
+    --ash:#8b8b94; --ash-dim:#5f5f67; --chrome:#f4f4f5;
+    --cold:#3b4a6b; --ember:#b8442e; --forge:#f97316; --hot:#fcd34d;
+    /* rgb triplet of --forge, driven by JS so glows/shadows heat with the score */
+    --forge-rgb:249,115,22;
+    --danger:#d4543a;
+    --f-display:'Space Grotesk',sans-serif;
+    --f-ui:'Inter',sans-serif;
+    --f-mono:'JetBrains Mono',monospace;
+    --r-card:14px; --r-ctl:8px;
+    --bar-h:56px; --side-w:228px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--void); color:var(--chrome); font-family:var(--f-ui);
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    min-height:100vh; overflow-x:hidden;
+  }
+  /* ambient forge glow, top-center, behind everything — heats with the score */
+  body::before{
+    content:""; position:fixed; top:-40%; left:50%; transform:translateX(-50%);
+    width:900px; height:700px; pointer-events:none; z-index:0;
+    background:radial-gradient(closest-side, rgba(var(--forge-rgb),.12), rgba(var(--forge-rgb),0) 70%);
+    animation:heart 5.5s ease-in-out infinite;
+  }
+  /* the "heart" — a forge furnace low-center, pulsing slowly behind everything */
+  body::after{
+    content:""; position:fixed; bottom:-22%; left:50%; transform:translateX(-50%);
+    width:1100px; height:620px; pointer-events:none; z-index:0;
+    background:radial-gradient(ellipse at 50% 80%, rgba(var(--forge-rgb),.14), rgba(var(--forge-rgb),0) 65%);
+    animation:heart 4s ease-in-out infinite;
+  }
+  @keyframes heart{
+    0%,100%{opacity:.55; transform:translateX(-50%) scale(1)}
+    50%    {opacity:1;   transform:translateX(-50%) scale(1.05)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    body::before,body::after{animation:none}
+  }
+
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  ::selection{background:rgba(249,115,22,.3)}
+
+  /* ---------- GLASS TOP BAR ---------- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; height:var(--bar-h); z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(16,16,18,.55);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    border-bottom:1px solid var(--edge-soft);
+  }
+  .logo{display:flex;align-items:center;gap:11px;user-select:none}
+  .logo .mark{width:24px;height:30px;display:block}
+  .logo .word{
+    font-family:var(--f-display); font-weight:600; font-size:18px;
+    letter-spacing:.32em; padding-left:.32em;
+    background:linear-gradient(180deg,#fff,#cfcfd4); -webkit-background-clip:text;
+    background-clip:text; color:transparent;
+  }
+  .topbar .bar-side{position:absolute;display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11px;color:var(--ash)}
+  .topbar .bar-left{left:18px}
+  .topbar .bar-right{right:18px}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--forge);box-shadow:0 0 8px var(--forge);animation:breathe 3s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+
+  /* ---------- SHELL ---------- */
+  .shell{position:relative;z-index:1;display:grid;grid-template-columns:var(--side-w) 1fr;min-height:100vh;padding-top:var(--bar-h)}
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    position:sticky; top:var(--bar-h); align-self:start; height:calc(100vh - var(--bar-h));
+    border-right:1px solid var(--edge-soft); padding:18px 14px;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .nav-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ash-dim);padding:14px 12px 7px}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r-ctl);
+    color:var(--ash); font-weight:450; font-size:13.5px; transition:.15s; position:relative;
+  }
+  .nav-item svg{width:17px;height:17px;flex:none;stroke:currentColor;stroke-width:1.7;fill:none}
+  .nav-item:hover{background:var(--steel);color:var(--chrome)}
+  .nav-item.active{background:var(--steel-2);color:var(--chrome)}
+  .nav-item.active::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--forge),var(--hot));box-shadow:0 0 10px var(--forge)}
+  .nav-item .badge{margin-left:auto;font-family:var(--f-mono);font-size:10px;background:rgba(212,84,58,.16);color:#f0a08c;padding:1px 6px;border-radius:20px}
+  .trust{margin-top:auto;padding:13px 12px;border:1px solid var(--edge-soft);border-radius:var(--r-ctl);background:linear-gradient(180deg,var(--steel),rgba(28,28,32,.4))}
+  .trust .row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ash)}
+  .trust .row+.row{margin-top:7px}
+  .trust svg{width:14px;height:14px;stroke:#6ee7a8;stroke-width:1.8;fill:none;flex:none}
+
+  /* ---------- MAIN ---------- */
+  .main{padding:30px 36px 60px;max-width:1180px}
+  .screen{display:none;animation:rise .4s cubic-bezier(.2,.7,.2,1)}
+  .screen.active{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page-eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--forge);margin-bottom:7px}
+  .page-title{font-family:var(--f-display);font-size:27px;font-weight:600;letter-spacing:-.01em}
+  .page-sub{color:var(--ash);margin-top:5px;font-size:13.5px;max-width:60ch}
+  .head{margin-bottom:26px}
+
+  .panel{background:linear-gradient(180deg,var(--steel),var(--anvil));border:1px solid var(--edge-soft);border-radius:var(--r-card);padding:22px}
+  .panel-eyebrow{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+
+  /* ---------- DASHBOARD HERO ---------- */
+  .hero{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-bottom:18px}
+  .score-card{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .score-card .glow{position:absolute;inset:0;background:radial-gradient(closest-side,rgba(var(--forge-rgb),.18),transparent 68%);pointer-events:none}
+  .gauge-wrap{position:relative;width:240px;height:240px}
+  .gauge-wrap svg{transform:rotate(0);overflow:visible}
+  .gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge-num{font-family:var(--f-display);font-size:66px;font-weight:600;line-height:1;letter-spacing:-.02em;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .gauge-max{font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:2px}
+  .gauge-tier{margin-top:14px;font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--hot);padding:5px 13px;border:1px solid rgba(252,211,77,.25);border-radius:30px;background:rgba(252,211,77,.06)}
+  .delta{margin-top:14px;font-size:13px;color:var(--ash)}
+  .delta b{color:#6ee7a8;font-family:var(--f-mono);font-weight:600}
+
+  /* category bars */
+  .cats{display:flex;flex-direction:column;justify-content:center;gap:15px}
+  .cat{display:grid;grid-template-columns:96px 1fr 64px;align-items:center;gap:14px}
+  .cat .name{font-size:13px;color:var(--ash)}
+  .cat .track{height:7px;border-radius:6px;background:var(--steel-2);overflow:hidden;position:relative}
+  .cat .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--ember),var(--forge),var(--hot));box-shadow:0 0 10px rgba(249,115,22,.4)}
+  .cat .val{font-family:var(--f-mono);font-size:13px;text-align:right}
+  .cat .val .d{color:#6ee7a8;font-size:11px}
+
+  /* grid row */
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:18px}
+
+  /* timeline chart */
+  .chart{width:100%;height:140px;display:block}
+  .chart-x{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:8px}
+
+  /* issues */
+  .issue{display:flex;align-items:center;gap:13px;padding:13px 0;border-top:1px solid var(--edge-soft)}
+  .issue:first-of-type{border-top:none;padding-top:2px}
+  .issue .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .issue .dot.warn{background:var(--forge);box-shadow:0 0 8px var(--forge)}
+  .issue .dot.crit{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  .issue .dot.info{background:var(--ash-dim)}
+  .issue .txt{flex:1}
+  .issue .txt .t{font-size:13.5px}
+  .issue .txt .s{font-size:12px;color:var(--ash-dim);margin-top:1px}
+  .mini-btn{font-size:12px;font-weight:500;padding:6px 13px;border-radius:7px;background:var(--steel-2);border:1px solid var(--edge);color:var(--chrome);transition:.15s;white-space:nowrap}
+  .mini-btn:hover{border-color:var(--forge);color:var(--hot)}
+
+  .fix-all{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:500;font-size:14px;padding:11px 22px;border-radius:10px;color:#1a0e00;background:linear-gradient(180deg,var(--hot),var(--forge));box-shadow:0 6px 20px -6px rgba(249,115,22,.6);transition:.15s}
+  .fix-all:hover{transform:translateY(-1px);box-shadow:0 10px 26px -6px rgba(249,115,22,.7)}
+  .fix-all svg{width:17px;height:17px;stroke:#1a0e00;stroke-width:2.2;fill:none}
+
+  /* achievements strip */
+  .ach-strip{display:flex;gap:12px;overflow:hidden}
+  .ach{flex:1;min-width:0;padding:14px;border:1px solid var(--edge-soft);border-radius:var(--r-ctl);background:var(--steel);display:flex;flex-direction:column;gap:8px}
+  .ach.locked{opacity:.4}
+  .ach .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25)}
+  .ach .ic svg{width:16px;height:16px;stroke:var(--hot);stroke-width:1.7;fill:none}
+  .ach.locked .ic{background:var(--steel-2);border-color:var(--edge)}
+  .ach.locked .ic svg{stroke:var(--ash-dim)}
+  .ach .nm{font-size:12.5px;font-weight:500}
+  .ach .ds{font-size:11px;color:var(--ash-dim);line-height:1.4}
+
+  /* ---------- GPU SCREEN ---------- */
+  .gpu-grid{display:grid;grid-template-columns:1fr 320px;gap:18px}
+  .tuner-row{margin-bottom:24px}
+  .tuner-row:last-child{margin-bottom:0}
+  .tuner-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px}
+  .tuner-head .lbl{font-size:13.5px}
+  .tuner-head .num{font-family:var(--f-mono);font-size:14px;color:var(--hot)}
+  .tuner-head .num .u{color:var(--ash-dim);font-size:11px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;background:var(--steel-2);outline:none}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--ember),var(--forge) 70%,var(--steel-2) 70%)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:var(--chrome);border:3px solid var(--forge);box-shadow:0 0 10px rgba(249,115,22,.5);cursor:grab}
+  input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--hot);outline-offset:2px}
+  .tuner-scale{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:7px}
+  .tuner-actions{display:flex;gap:10px;margin-top:6px}
+  .btn-ghost{font-size:13px;font-weight:500;padding:9px 16px;border-radius:8px;border:1px solid var(--edge);color:var(--ash);transition:.15s}
+  .btn-ghost:hover{color:var(--chrome);border-color:var(--ash-dim)}
+  .btn-apply{font-size:13px;font-weight:500;padding:9px 18px;border-radius:8px;color:#1a0e00;background:linear-gradient(180deg,var(--hot),var(--forge));transition:.15s}
+  .btn-apply:hover{transform:translateY(-1px)}
+
+  .live{display:flex;flex-direction:column;gap:0}
+  .metric{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--edge-soft)}
+  .metric:first-of-type{border-top:none;padding-top:2px}
+  .metric .ml{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ash)}
+  .metric .ml svg{width:16px;height:16px;stroke:var(--ash-dim);stroke-width:1.7;fill:none}
+  .metric .mv{font-family:var(--f-mono);font-size:17px;font-weight:500}
+  .metric .mv .u{font-size:11px;color:var(--ash-dim);margin-left:2px}
+  .temp-ok{color:var(--hot)}
+  .osd-card{margin-top:18px}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+  .toggle-row+.toggle-row{border-top:1px solid var(--edge-soft)}
+  .toggle-row .tl{font-size:13px}
+  .toggle-row .ts{font-size:11.5px;color:var(--ash-dim);margin-top:2px}
+  .switch{width:40px;height:23px;border-radius:20px;background:var(--steel-2);border:1px solid var(--edge);position:relative;transition:.18s;flex:none}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--ash);transition:.18s}
+  .switch.on{background:linear-gradient(90deg,var(--forge),var(--hot));border-color:transparent}
+  .switch.on::after{left:19px;background:#1a0e00}
+
+  /* ---------- SISTEMA / SECURITY SCREEN ---------- */
+  .trust-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:var(--r-card);border:1px solid rgba(110,231,168,.18);background:linear-gradient(180deg,rgba(110,231,168,.06),transparent);margin-bottom:20px}
+  .trust-banner .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(110,231,168,.1);border:1px solid rgba(110,231,168,.22);flex:none}
+  .trust-banner .ic svg{width:20px;height:20px;stroke:#6ee7a8;stroke-width:1.8;fill:none}
+  .trust-banner .t{font-size:14px;font-weight:500}
+  .trust-banner .s{font-size:12.5px;color:var(--ash);margin-top:2px}
+
+  .fix-card{border:1px solid var(--edge-soft);border-radius:var(--r-card);padding:18px 20px;margin-bottom:14px;background:linear-gradient(180deg,var(--steel),var(--anvil));transition:.15s}
+  .fix-card:hover{border-color:var(--edge)}
+  .fc-top{display:flex;align-items:flex-start;gap:13px}
+  .fc-sev{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+  .fc-sev.warn{background:var(--forge);box-shadow:0 0 8px var(--forge)}
+  .fc-sev.crit{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  .fc-main{flex:1}
+  .fc-title{font-size:15px;font-weight:500}
+  .fc-why{font-size:13px;color:var(--ash);margin-top:5px;line-height:1.55}
+  .fc-diff{display:flex;align-items:center;gap:12px;margin-top:13px;font-family:var(--f-mono);font-size:12.5px;flex-wrap:wrap}
+  .fc-diff .from{color:var(--danger);text-decoration:line-through;text-decoration-color:rgba(212,84,58,.5)}
+  .fc-diff .arrow{color:var(--ash-dim)}
+  .fc-diff .to{color:#6ee7a8}
+  .fc-diff .chip{padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge)}
+  .fc-actions{display:flex;gap:9px;margin-left:auto;align-items:flex-start}
+  .reversible{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ash-dim);margin-top:13px}
+  .fix-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:40px 24px;border:1px dashed var(--edge);border-radius:var(--r-card);background:linear-gradient(180deg,var(--steel),var(--anvil))}
+  .fix-empty[hidden]{display:none}
+  .fix-empty .fe-mark{width:40px;height:40px;color:#6ee7a8}
+  .fix-empty .fe-mark svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6}
+  .fix-empty .fe-t{font-size:15px;font-weight:500;color:var(--chrome)}
+  .fix-empty .fe-s{font-size:12.5px;color:var(--ash);max-width:380px;line-height:1.5}
+
+  /* ===== Wizard de boas-vindas (primeiro uso) ===== */
+  .fw-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(6,6,8,.72);backdrop-filter:blur(6px);animation:fwfade .25s ease}
+  .fw-overlay[hidden]{display:none}
+  @keyframes fwfade{from{opacity:0}to{opacity:1}}
+  .fw-card{width:min(640px,100%);max-height:90vh;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--steel),var(--anvil));border:1px solid var(--edge);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(249,115,22,.08);overflow:hidden;position:relative}
+  .fw-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:var(--steel-2);border:1px solid var(--edge);color:var(--ash);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .fw-close:hover{border-color:var(--forge);color:var(--hot)}
+  .fw-close:focus-visible,.fw-overlay button:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+  .fw-rail{display:flex;gap:8px;padding:22px 26px 0}
+  .fw-dot{flex:1;height:4px;border-radius:2px;background:var(--steel-2);transition:background .3s}
+  .fw-dot.done{background:var(--forge)}
+  .fw-dot.now{background:linear-gradient(90deg,var(--forge),var(--hot))}
+  .fw-body{padding:22px 26px;overflow-y:auto}
+  .fw-eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--forge)}
+  .fw-title{font-size:23px;font-weight:600;margin-top:8px;letter-spacing:-.01em}
+  .fw-desc{font-size:14px;color:var(--ash);line-height:1.6;margin-top:8px;max-width:52ch}
+  .fw-step{margin-top:20px}
+  .fw-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 26px;border-top:1px solid var(--edge-soft);background:rgba(0,0,0,.15)}
+  .fw-foot-right{display:flex;gap:10px;align-items:center}
+  .fw-skip{font-size:12.5px;color:var(--ash-dim);background:none;border:none;text-decoration:underline;text-underline-offset:3px}
+  .fw-skip:hover{color:var(--ash)}
+  .fw-back{font-size:13px;padding:9px 16px;border-radius:8px;background:var(--steel-2);border:1px solid var(--edge);color:var(--chrome)}
+  .fw-back:hover{border-color:var(--forge)}
+  .fw-next{font-size:13px;font-weight:500;padding:9px 20px;border-radius:8px;color:#1a0e00;background:linear-gradient(180deg,var(--hot),var(--forge));border:none}
+  .fw-next:hover{transform:translateY(-1px)}
+  .fw-next:disabled{opacity:.5;transform:none;cursor:default}
+  /* blocos internos reutilizáveis nos passos */
+  .fw-stat{display:flex;align-items:baseline;gap:10px;padding:12px 0;border-bottom:1px solid var(--edge-soft)}
+  .fw-stat:last-child{border-bottom:none}
+  .fw-stat .k{font-family:var(--f-mono);font-size:11.5px;color:var(--ash-dim);min-width:120px;text-transform:uppercase;letter-spacing:.04em}
+  .fw-stat .v{font-size:14px;color:var(--chrome)}
+  .fw-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--edge)}
+  .fw-pill.ok{color:#6ee7a8;border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1)}
+  .fw-pill.warn{color:var(--hot);border-color:rgba(249,115,22,.4);background:rgba(249,115,22,.1)}
+  .fw-gauge{font-family:var(--f-mono);font-size:44px;font-weight:600;line-height:1}
+  .fw-note{font-size:12.5px;color:var(--ash-dim);line-height:1.55;margin-top:14px;padding:12px 14px;border:1px dashed var(--edge);border-radius:10px}
+  .fw-soon{display:inline-flex;align-items:center;gap:7px;font-family:var(--f-mono);font-size:11px;color:var(--hot);padding:4px 10px;border:1px solid rgba(249,115,22,.35);border-radius:20px;background:rgba(249,115,22,.08)}
+  .fw-check{display:flex;gap:11px;padding:12px 14px;border:1px solid var(--edge-soft);border-radius:10px;margin-bottom:9px;background:var(--steel-2)}
+  .fw-check .fc-i{width:18px;height:18px;flex:none;color:#6ee7a8;margin-top:1px}
+  .fw-trophy{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:8px 0}
+  .fw-trophy .tr-medal{width:72px;height:72px;color:var(--hot);filter:drop-shadow(0 0 16px rgba(249,115,22,.5))}
+  /* trigger flutuante p/ reabrir */
+  .fw-fab{position:fixed;bottom:20px;right:20px;z-index:900;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;padding:10px 16px;border-radius:24px;color:var(--chrome);background:linear-gradient(180deg,var(--steel),var(--anvil));border:1px solid var(--edge);box-shadow:0 8px 24px rgba(0,0,0,.4);transition:.15s}
+  .fw-fab[hidden]{display:none}
+  .fw-fab:hover{border-color:var(--forge);color:var(--hot)}
+  .fw-fab svg{width:15px;height:15px}
+  @media (prefers-reduced-motion: reduce){.fw-overlay,.fw-next{animation:none;transition:none}}
+  .reversible svg{width:13px;height:13px;stroke:var(--ash-dim);stroke-width:1.7;fill:none}
+
+  .foot-note{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ash-dim);font-family:var(--f-mono)}
+
+  /* ---------- GPU PROFILES ---------- */
+  .profile-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+  .profile-chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip-btn{font-family:var(--f-mono);font-size:11.5px;padding:6px 15px;border-radius:6px;border:1px solid var(--edge);color:var(--ash);background:var(--steel);transition:.15s;letter-spacing:.04em}
+  .chip-btn:hover{border-color:var(--ash-dim);color:var(--chrome)}
+  .chip-btn.on{border-color:var(--forge);color:var(--hot);background:rgba(249,115,22,.1)}
+  .autotune-btn{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;padding:9px 18px;border-radius:9px;border:1px solid rgba(252,211,77,.28);color:var(--hot);background:rgba(252,211,77,.07);transition:.15s;white-space:nowrap}
+  .autotune-btn:hover{background:rgba(252,211,77,.14);border-color:var(--hot)}
+  .autotune-btn svg{width:16px;height:16px;stroke:var(--hot);stroke-width:1.8;fill:none}
+
+  /* ---------- VF CURVE ---------- */
+  .vf-grid{display:grid;grid-template-columns:1fr 300px;gap:18px;margin-bottom:18px}
+  .vf-panel{position:relative}
+  .vf-svg{width:100%;display:block;touch-action:none}
+  .vf-node{cursor:grab;outline:none;transition:r .12s}
+  .vf-node:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+  .vf-actions{display:flex;gap:9px;margin-top:12px;align-items:center}
+  .vf-hint{font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);margin-left:auto}
+  .vf-zone-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+
+  /* ---------- PROCESS LIST ---------- */
+  .proc-list{display:flex;flex-direction:column;gap:0}
+  .proc-row{display:grid;grid-template-columns:1fr 52px 52px 52px;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--edge-soft);font-size:12.5px}
+  .proc-row:first-of-type{border-top:none;padding-top:2px}
+  .proc-name{color:var(--chrome);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proc-val{font-family:var(--f-mono);font-size:12px;text-align:right;color:var(--ash)}
+  .proc-val.hi{color:var(--forge)}
+  .proc-head{display:grid;grid-template-columns:1fr 52px 52px 52px;gap:10px;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash-dim);padding-bottom:10px}
+
+  /* ---------- TOAST NOTIFICATION ---------- */
+  .toast-demo{position:relative;display:flex;gap:12px;padding:14px 16px;border-radius:10px;border:1px solid rgba(212,84,58,.35);background:linear-gradient(180deg,rgba(212,84,58,.12),rgba(212,84,58,.04));margin-bottom:18px}
+  .toast-demo .td-ic{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:rgba(212,84,58,.15);border:1px solid rgba(212,84,58,.3);flex:none}
+  .toast-demo .td-ic svg{width:18px;height:18px;stroke:#f0a08c;stroke-width:1.8;fill:none}
+  .toast-demo .td-title{font-size:13.5px;font-weight:500;margin-bottom:3px}
+  .toast-demo .td-sub{font-size:12px;color:var(--ash)}
+  .toast-demo .td-actions{display:flex;gap:8px;margin-top:10px}
+  .toast-demo .td-fix{font-size:12.5px;font-weight:500;padding:6px 14px;border-radius:7px;background:linear-gradient(180deg,var(--hot),var(--forge));color:#1a0e00}
+  .toast-demo .td-dismiss{font-size:12.5px;padding:6px 14px;border-radius:7px;border:1px solid var(--edge);color:var(--ash)}
+  .toast-label{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:10px}
+
+  /* ---------- LED BARS ---------- */
+  .led-bar{display:flex;gap:2px;align-items:center;height:8px}
+  .led-seg{height:100%;flex:1;border-radius:1.5px;background:var(--steel-2)}
+  .led-seg.s-cold{background:#3b4a6b;box-shadow:0 0 4px rgba(59,74,107,.7)}
+  .led-seg.s-ember{background:#b8442e;box-shadow:0 0 4px rgba(184,68,46,.7)}
+  .led-seg.s-forge{background:#f97316;box-shadow:0 0 5px rgba(249,115,22,.8)}
+  .led-seg.s-hot{background:#fcd34d;box-shadow:0 0 6px rgba(252,211,77,.9)}
+
+  /* ---------- ARC GAUGES ---------- */
+  .arc-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .arc-widget{display:flex;flex-direction:column;align-items:center;padding-top:10px}
+  .arc-wrap{position:relative;width:100%;max-width:180px}
+  .arc-wrap svg{display:block;overflow:visible;width:100%;height:auto}
+  .arc-readout{display:flex;align-items:baseline;justify-content:center;margin-top:6px;gap:4px}
+  .arc-num{font-family:var(--f-display);font-size:38px;font-weight:600;line-height:1}
+  .arc-unit{font-family:var(--f-mono);font-size:13px;color:var(--ash-dim)}
+  .arc-sub{font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);margin-top:4px;text-align:center}
+
+  /* ---------- NEON READOUTS ---------- */
+  .neon-hot{color:var(--hot)!important;text-shadow:0 0 14px rgba(252,211,77,.5),0 0 28px rgba(249,115,22,.2)}
+  .neon-forge{color:var(--forge)!important;text-shadow:0 0 14px rgba(249,115,22,.55)}
+  .neon-ok{color:#a0f4c0!important;text-shadow:0 0 12px rgba(110,231,168,.4)}
+  .neon-cold{color:#7ab8f5!important;text-shadow:0 0 12px rgba(100,160,245,.4)}
+
+  /* ---------- METRIC MINI-BAR ---------- */
+  .metric-bar{margin-top:6px;height:3px;border-radius:3px;background:var(--steel-2);overflow:hidden}
+  .metric-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cold),var(--forge));box-shadow:0 0 6px rgba(249,115,22,.4)}
+
+  /* ---------- AFTERBURNER MONITOR WIDGET ---------- */
+  .ab-monitor{border:1px solid var(--edge-soft);border-radius:var(--r-card);padding:18px 22px;background:linear-gradient(180deg,var(--steel),var(--anvil));margin-bottom:14px}
+  .ab-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .ab-title{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ash-dim)}
+  .ab-live-dot{width:6px;height:6px;border-radius:50%;background:#6ee7a8;box-shadow:0 0 8px rgba(110,231,168,.6);animation:pulse-live 2s infinite}
+  @keyframes pulse-live{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  .ab-rows{display:flex;flex-direction:column;gap:11px}
+  .ab-row{display:grid;grid-template-columns:54px 1fr 78px;align-items:center;gap:14px}
+  .ab-label{font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);letter-spacing:.06em}
+  .ab-leds{display:flex;gap:2px;align-items:center}
+  .ab-led{height:10px;flex:1;border-radius:1.5px;background:var(--steel-2)}
+  .ab-led.on-cold{background:#3b82f6;box-shadow:0 0 5px rgba(59,130,246,.7)}
+  .ab-led.on-blue{background:#60a5fa;box-shadow:0 0 5px rgba(96,165,250,.6)}
+  .ab-led.on-green{background:#22c55e;box-shadow:0 0 5px rgba(34,197,94,.7)}
+  .ab-led.on-amber{background:#f59e0b;box-shadow:0 0 5px rgba(245,158,11,.7)}
+  .ab-led.on-orange{background:#f97316;box-shadow:0 0 5px rgba(249,115,22,.8)}
+  .ab-led.on-red{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.85)}
+  .ab-val{font-family:var(--f-mono);font-size:17px;font-weight:600;text-align:right;letter-spacing:-.01em}
+  .ab-val .ab-unit{font-size:10px;font-weight:400;color:var(--ash-dim);margin-left:2px;letter-spacing:.04em}
+
+  /* ---------- DASHBOARD SINGLE-VIEWPORT GRID ---------- */
+  #dash{display:none;flex-direction:column;height:calc(100vh - var(--bar-h) - 90px);overflow:hidden}
+  #dash.active{display:flex}
+
+  .dash-topbar{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;flex:none}
+  .dash-topbar-title{font-size:18px;font-weight:700;font-family:var(--f-display);color:var(--chrome);margin-left:10px;letter-spacing:-.02em}
+  .dash-topbar-note{font-family:var(--f-mono);font-size:11px;color:var(--ash-dim)}
+
+  .dash-grid{display:grid;grid-template-columns:210px 1fr 250px;gap:14px;flex:1;min-height:0;overflow:hidden}
+  .dash-col{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden}
+  .dash-col .panel{padding:16px 18px}
+  .dash-col .panel.grow{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+  .dash-col .panel.grow .panel-eyebrow{flex:none}
+
+  /* score card */
+  .dash-score-card{display:flex;flex-direction:column;align-items:center;padding:18px 14px 14px;flex:none;position:relative;overflow:hidden}
+  .dash-gauge-wrap{position:relative;width:140px;height:140px;flex:none}
+  .dash-gauge-wrap svg{position:absolute;inset:0;width:100%;height:100%}
+  .dash-gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .dash-gauge-center .gauge-num{font-family:var(--f-display);font-size:36px;font-weight:700;line-height:1;letter-spacing:-.03em;background:linear-gradient(180deg,var(--hot),var(--forge));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .dash-gauge-center .gauge-max{font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:1px}
+
+  /* categories */
+  .dash-cats{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .dcat{display:grid;grid-template-columns:64px 1fr 26px;align-items:center;gap:8px}
+  .dcat-name{font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);letter-spacing:.03em}
+  .dcat-track{height:5px;border-radius:3px;background:var(--steel-2);overflow:hidden}
+  .dcat-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cold),var(--forge));box-shadow:0 0 6px rgba(249,115,22,.35)}
+  .dcat-val{font-family:var(--f-mono);font-size:11px;font-weight:600;text-align:right}
+
+  /* timeline chart — altura fixa pra não distorcer com preserveAspectRatio=none */
+  .dash-chart{width:100%;display:block;height:90px;flex:none}
+
+  /* achievements compact */
+  .dach{display:flex;align-items:center;gap:9px}
+  .dach-ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.22);flex:none}
+  .dach-ic svg{width:13px;height:13px;stroke:var(--forge);stroke-width:1.8;fill:none}
+  .dach-ic.on{background:rgba(252,211,77,.1);border-color:rgba(252,211,77,.3)}
+  .dach-ic.on svg{stroke:var(--hot)}
+  .dach-nm{font-size:12px;color:var(--ash)}
+
+  /* ---------- ADVANCED GATE (V/F curve lock) ---------- */
+  .adv-gate{margin-top:24px;border:1px solid rgba(239,68,68,.2);border-radius:var(--r-card);overflow:hidden}
+  .adv-gate-header{display:flex;align-items:center;gap:10px;padding:14px 18px;background:rgba(239,68,68,.06);cursor:pointer;user-select:none;transition:.15s}
+  .adv-gate-header:hover{background:rgba(239,68,68,.1)}
+  .adv-gate-lock{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);flex:none}
+  .adv-gate-lock svg{width:15px;height:15px;stroke:#f0a08c;stroke-width:2;fill:none}
+  .adv-gate-label{flex:1}
+  .adv-gate-title{font-size:13.5px;font-weight:500;color:#f0a08c}
+  .adv-gate-sub{font-size:11.5px;color:var(--ash-dim);margin-top:2px}
+  .adv-gate-chevron{width:18px;height:18px;stroke:var(--ash-dim);stroke-width:2;fill:none;transition:transform .2s}
+  .adv-gate-chevron.open{transform:rotate(180deg)}
+  .adv-gate-body{display:none;padding:20px 18px 18px;border-top:1px solid rgba(239,68,68,.15)}
+  .adv-gate-body.open{display:block}
+  .adv-warn-strip{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);margin-bottom:18px;font-size:12.5px;color:#f0a08c}
+  .adv-warn-strip svg{width:16px;height:16px;stroke:#f0a08c;stroke-width:2;fill:none;flex:none}
+
+  @media(max-width:1080px){
+    .hero,.grid-2,.gpu-grid,.vf-grid,.arc-row{grid-template-columns:1fr}
+    .ach-strip{flex-wrap:wrap}
+    .ach{min-width:140px}
+    .autotune-btn{margin-left:0}
+  }
+  @media(max-width:760px){
+    .shell{grid-template-columns:1fr}
+    .sidebar{display:none}
+    .main{padding:22px 18px 50px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== WIZARD DE BOAS-VINDAS (primeiro uso) =====
+     Não-modal por escolha: pode pular/fechar/reabrir a qualquer hora (FAB no canto).
+     Conteúdo dos passos é renderizado por JS (forgeWizard) com dados reais do daemon. -->
+<div id="forge-wizard" class="fw-overlay" hidden role="dialog" aria-modal="true"
+     aria-labelledby="fw-title" aria-describedby="fw-desc">
+  <div class="fw-card">
+    <button class="fw-close" id="fw-close" data-cy="wizard-close-btn" aria-label="Fechar assistente">&times;</button>
+    <div class="fw-rail" id="fw-rail" aria-hidden="true"></div>
+    <div class="fw-body">
+      <div class="fw-eyebrow" id="fw-eyebrow">Boas-vindas</div>
+      <h2 class="fw-title" id="fw-title">A Forja</h2>
+      <p class="fw-desc" id="fw-desc"></p>
+      <div class="fw-step" id="fw-step" aria-live="polite"></div>
+    </div>
+    <div class="fw-foot">
+      <button class="fw-skip" id="fw-skip" data-cy="wizard-skip">Pular por enquanto</button>
+      <div class="fw-foot-right">
+        <button class="fw-back" id="fw-back" data-cy="wizard-step-back-btn" hidden>Voltar</button>
+        <button class="fw-next" id="fw-next" data-cy="wizard-step-next-btn">Próximo</button>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="fw-fab" id="fw-fab" aria-label="Abrir assistente de boas-vindas" hidden>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+  Assistente
+</button>
+
+<!-- ===== GLASS TOP BAR ===== -->
+<header class="topbar">
+  <div class="bar-side bar-left"><span class="pulse"></span> Sentinela ativo</div>
+  <div class="logo">
+    <svg class="mark" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="m" x1="2" y1="28" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#3b4a6b"/><stop offset=".45" stop-color="#b8442e"/>
+          <stop offset=".8" stop-color="#f97316"/><stop offset="1" stop-color="#fcd34d"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2 L22 17 L12 13 Z" fill="url(#m)"/>
+      <path d="M12 2 L2 17 L12 13 Z" fill="url(#m)" opacity=".55"/>
+      <path d="M2 17 L22 17 L12 28 Z" fill="url(#m)" opacity=".85"/>
+    </svg>
+    <span class="word">FORGE</span>
+  </div>
+  <div class="bar-side bar-right">v1.0.0 · open source</div>
+</header>
+
+<div class="shell">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="nav-eyebrow">Visão geral</div>
+    <a class="nav-item active" data-screen="dash" href="#">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      Painel
+    </a>
+    <div class="nav-eyebrow">Otimização</div>
+    <a class="nav-item" data-screen="sys" href="#">
+      <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
+      Sistema <span class="badge" id="nav-sys-badge" hidden>0</span>
+    </a>
+    <a class="nav-item" data-screen="hw" href="#">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      Hardware
+    </a>
+    <a class="nav-item" data-screen="gpu" href="#">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 21h10M9 17v4M15 17v4"/><circle cx="9" cy="11" r="2"/></svg>
+      GPU
+    </a>
+    <a class="nav-item" data-screen="games" href="#">
+      <svg viewBox="0 0 24 24"><path d="M6 11h4M8 9v4"/><circle cx="16" cy="10" r="1"/><circle cx="18" cy="13" r="1"/><rect x="2" y="6" width="20" height="12" rx="3"/></svg>
+      Jogos
+    </a>
+    <a class="nav-item" data-screen="mon" href="#">
+      <svg viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+      Monitor
+    </a>
+    <div class="nav-eyebrow">Histórico</div>
+    <a class="nav-item" data-screen="hist" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      Linha do tempo
+    </a>
+
+    <div class="trust">
+      <div class="row"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg> Código aberto · auditável</div>
+      <div class="row"><svg viewBox="0 0 24 24"><path d="M5 12h14M5 12a7 7 0 0 1 14 0M5 12a7 7 0 0 0 14 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Zero telemetria</div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- ========== DASHBOARD — single-viewport, sem scroll ========== -->
+    <section class="screen active" id="dash">
+
+      <!-- topo compacto -->
+      <div class="dash-topbar">
+        <div>
+          <span class="page-eyebrow" style="display:inline">Temperatura de forja</span>
+          <span class="dash-topbar-title" id="dash-topbar-title">Seu PC está forjado</span>
+        </div>
+        <span class="dash-topbar-note" id="dash-topbar-note">Sistema alinhado com o baseline</span>
+      </div>
+
+      <!-- grade 3 colunas que preenche o resto da tela -->
+      <div class="dash-grid">
+
+        <!-- ── COLUNA ESQUERDA: score + categorias ── -->
+        <div class="dash-col dash-left">
+
+          <!-- Score card compacto -->
+          <div class="panel dash-score-card">
+            <div class="glow"></div>
+            <div class="dash-gauge-wrap">
+              <svg width="140" height="140" viewBox="0 0 280 280" aria-label="Score 91 de 100">
+                <defs>
+                  <linearGradient id="heatArc" x1="40" y1="240" x2="240" y2="40" gradientUnits="userSpaceOnUse">
+                    <stop id="hs0" offset="0"   stop-color="#3b4a6b"/><stop id="hs1" offset=".4" stop-color="#b8442e"/>
+                    <stop id="hs2" offset=".72" stop-color="#f97316"/><stop id="hs3" offset="1"  stop-color="#fcd34d"/>
+                  </linearGradient>
+                  <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+                <circle cx="140" cy="140" r="120" fill="none" stroke="#1c1c20" stroke-width="18" stroke-linecap="round"
+                  stroke-dasharray="565.5 753.98" transform="rotate(135 140 140)"/>
+                <circle cx="140" cy="140" r="120" fill="none" stroke="url(#heatArc)" stroke-width="18" stroke-linecap="round"
+                  stroke-dasharray="514.6 753.98" transform="rotate(135 140 140)" filter="url(#bloom)"/>
+              </svg>
+              <div class="dash-gauge-center">
+                <div class="gauge-num" id="dash-score-num">91</div>
+                <div class="gauge-max">/ 100</div>
+              </div>
+            </div>
+            <div class="gauge-tier" id="dash-tier">Forjado</div>
+          </div>
+
+          <!-- Categorias -->
+          <div class="panel grow">
+            <div class="panel-eyebrow">Por categoria</div>
+            <div class="dash-cats">
+              <div class="dcat"><span class="dcat-name">Sistema</span><div class="dcat-track"><div class="dcat-fill" style="width:82%"></div></div><span class="dcat-val" style="color:#f59e0b">82</span></div>
+              <div class="dcat"><span class="dcat-name">Hardware</span><div class="dcat-track"><div class="dcat-fill" style="width:95%"></div></div><span class="dcat-val" style="color:#6ee7a8">95</span></div>
+              <div class="dcat"><span class="dcat-name">GPU</span><div class="dcat-track"><div class="dcat-fill" style="width:98%"></div></div><span class="dcat-val" style="color:#6ee7a8">98</span></div>
+              <div class="dcat"><span class="dcat-name">Jogos</span><div class="dcat-track"><div class="dcat-fill" style="width:88%"></div></div><span class="dcat-val" style="color:#84cc16">88</span></div>
+              <div class="dcat"><span class="dcat-name">Sentinel</span><div class="dcat-track"><div class="dcat-fill" style="width:77%"></div></div><span class="dcat-val" style="color:#f59e0b">77</span></div>
+              <div class="dcat"><span class="dcat-name">Monitor</span><div class="dcat-track"><div class="dcat-fill" style="width:100%"></div></div><span class="dcat-val" style="color:#6ee7a8">100</span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── COLUNA CENTRAL: ajustes + timeline ── -->
+        <div class="dash-col dash-center">
+
+          <!-- Issues -->
+          <div class="panel" style="flex:0 0 auto">
+            <div class="panel-eyebrow">Ajustes pendentes <span id="dash-fix-count" style="color:var(--forge)">0</span></div>
+            <!-- Cards reais, renderizados de /api/status → tasks (só os needed). Zero estático. -->
+            <div id="dash-fix-list"></div>
+            <div id="dash-fix-empty" class="issue" hidden>
+              <span class="dot" style="background:#6ee7a8"></span>
+              <div class="txt"><div class="t">Tudo forjado</div><div class="s">Seu PC já bate os alvos seguros do Forge</div></div>
+            </div>
+            <div id="dash-fix-actions" style="margin-top:14px;display:none;justify-content:flex-end">
+              <button class="fix-all"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg> Forjar tudo</button>
+            </div>
+          </div>
+
+          <!-- Timeline -->
+          <div class="panel grow">
+            <div class="panel-eyebrow">Linha do tempo · 14 dias <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:2px 8px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);letter-spacing:0;text-transform:none">exemplo</span></div>
+            <svg class="chart dash-chart" viewBox="0 0 600 120" preserveAspectRatio="none" aria-label="Evolução do score">
+              <defs>
+                <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#f97316" stop-opacity=".32"/><stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#b8442e"/><stop offset="1" stop-color="#fcd34d"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,108 L50,100 L100,86 L150,78 L200,60 L250,48 L300,36 L350,64 L400,50 L450,30 L500,20 L550,12 L600,8 L600,120 L0,120 Z" fill="url(#fillGrad)"/>
+              <path d="M0,108 L50,100 L100,86 L150,78 L200,60 L250,48 L300,36 L350,64 L400,50 L450,30 L500,20 L550,12 L600,8" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+              <circle cx="350" cy="64" r="4" fill="#d4543a" stroke="#141416" stroke-width="2"/>
+              <circle cx="600" cy="8"  r="4.5" fill="#fcd34d" stroke="#141416" stroke-width="2"/>
+            </svg>
+            <div class="chart-x" style="margin-top:4px"><span>Dia 0</span><span>Dia 9 · WU reverteu</span><span>Hoje · 91</span></div>
+          </div>
+
+        </div>
+
+        <!-- ── COLUNA DIREITA: monitor ao vivo + conquistas ── -->
+        <div class="dash-col dash-right">
+
+          <!-- Monitor AB -->
+          <div class="panel" style="flex:0 0 auto">
+            <div class="panel-eyebrow">
+              Monitor ao vivo
+              <span style="display:inline-flex;align-items:center;gap:5px;margin-left:6px">
+                <span style="width:6px;height:6px;border-radius:50%;background:#6ee7a8;box-shadow:0 0 7px rgba(110,231,168,.7);display:inline-block;animation:pulse-live 2s infinite"></span>
+                <span id="ab-ts" style="font-family:var(--f-mono);font-size:9px;color:var(--ash-dim)">–</span>
+              </span>
+            </div>
+            <div class="ab-rows">
+              <div class="ab-row">
+                <span class="ab-label">GPU</span>
+                <div class="ab-leds" id="ab-gpu-bar"></div>
+                <div style="display:flex;align-items:baseline;gap:2px;white-space:nowrap"><span id="ab-gpu-mhz" class="neon-cold" style="font-family:var(--f-mono);font-size:14px;font-weight:600">1905</span><span style="font-family:var(--f-mono);font-size:9px;color:var(--ash-dim)">MHz</span></div>
+              </div>
+              <div class="ab-row">
+                <span class="ab-label">MEM</span>
+                <div class="ab-leds" id="ab-mem-bar"></div>
+                <div style="display:flex;align-items:baseline;gap:2px;white-space:nowrap"><span id="ab-mem-mhz" class="neon-cold" style="font-family:var(--f-mono);font-size:14px;font-weight:600">7000</span><span style="font-family:var(--f-mono);font-size:9px;color:var(--ash-dim)">MHz</span></div>
+              </div>
+              <div class="ab-row">
+                <span class="ab-label">TEMP</span>
+                <div class="ab-leds" id="ab-temp-bar"></div>
+                <div style="display:flex;align-items:baseline;gap:2px;white-space:nowrap"><span id="ab-temp-c" class="neon-ok" style="font-family:var(--f-mono);font-size:14px;font-weight:600">68</span><span style="font-family:var(--f-mono);font-size:9px;color:var(--ash-dim)">°C</span></div>
+              </div>
+              <div class="ab-row">
+                <span class="ab-label">VOLT</span>
+                <div class="ab-leds" id="ab-volt-bar"></div>
+                <div style="display:flex;align-items:baseline;gap:2px;white-space:nowrap"><span id="ab-volt-mv" class="neon-hot" style="font-family:var(--f-mono);font-size:14px;font-weight:600">900</span><span style="font-family:var(--f-mono);font-size:9px;color:var(--ash-dim)">mV</span></div>
+              </div>
+            </div>
+            <div style="margin-top:8px;font-family:var(--f-mono);font-size:9.5px;color:var(--ash-dim)">ao vivo · nvidia-smi · VOLT n/d</div>
+          </div>
+
+          <!-- Conquistas compactas -->
+          <div class="panel grow">
+            <div class="panel-eyebrow">Conquistas <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:2px 8px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);letter-spacing:0;text-transform:none">prévia</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <div class="dach"><div class="dach-ic on"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div><span class="dach-nm">Primeiro forjamento</span></div>
+              <div class="dach"><div class="dach-ic on"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><span class="dach-nm">Mestre térmico</span></div>
+              <div class="dach"><div class="dach-ic on"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></div><span class="dach-nm">Guarda Sentinela</span></div>
+              <div class="dach"><div class="dach-ic on"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 21h10"/></svg></div><span class="dach-nm">Tuner de GPU</span></div>
+              <div class="dach"><div class="dach-ic" style="opacity:.35"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></div><span class="dach-nm" style="opacity:.4">Score perfeito</span></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div><!-- /dash-grid -->
+    </section>
+
+    <!-- ========== GPU ========== -->
+    <section class="screen" id="gpu">
+      <div class="head">
+        <div class="page-eyebrow">NVIDIA GeForce RTX 3060 Ti · Driver 572.83</div>
+        <h1 class="page-title">Ajuste de GPU</h1>
+        <p class="page-sub">Telemetria ao vivo e limite de energia via nvidia-smi. Reversível, com auto-reverte. Undervolt e curva V/F (NVAPI) chegam na Fase 2.</p>
+      </div>
+
+      <!-- V/F Curve REMOVIDA: era mock. Fase 1 = power limit real (nvidia-smi). -->
+      <div class="vf-grid">
+        <div style="display:flex;flex-direction:column;gap:14px">
+
+          <!-- Power limit: REAL via nvidia-smi -pl. Reversível + auto-reverte. -->
+          <div class="panel">
+            <div class="panel-eyebrow">Limite de energia <span class="pulse"></span></div>
+            <p style="font-size:12.5px;color:var(--ash);margin:0 0 16px;line-height:1.5">Menos watts = menos calor e consumo (clocks caem sob carga pesada). Aplica via nvidia-smi, revers&iacute;vel, e <b style="color:var(--chrome)">auto-reverte em 15s</b> se voc&ecirc; n&atilde;o confirmar.</p>
+            <div class="tuner-row">
+              <div class="tuner-head"><span class="lbl">Power limit</span><span class="num"><span id="pl-watts">&mdash;</span><span class="u"> W</span></span></div>
+              <input type="range" id="pl-slider" min="0" max="100" value="0" disabled aria-label="Limite de energia em watts"/>
+              <div class="tuner-scale"><span id="pl-min">&mdash;</span><span id="pl-default">padr&atilde;o &mdash;</span><span id="pl-max">&mdash;</span></div>
+            </div>
+            <div class="tuner-actions">
+              <button class="btn-apply" id="pl-apply" disabled>Aplicar</button>
+              <button class="btn-ghost" id="pl-reset">Padr&atilde;o</button>
+            </div>
+            <div id="pl-status" style="font-size:12px;color:var(--ash-dim);margin-top:10px;min-height:16px">Lendo limites do driver&hellip;</div>
+            <div id="pl-confirm" style="display:none;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(252,211,77,.08);border:1px solid rgba(252,211,77,.25)">
+              <span style="font-size:13px;color:var(--chrome);flex:1">Reverte em <span id="pl-count" style="font-family:var(--f-mono);color:var(--hot)">15</span>s. Est&aacute;vel?</span>
+              <button class="btn-apply" id="pl-keep" style="padding:7px 16px">Manter</button>
+            </div>
+          </div>
+
+          <!-- Fase 2: NVAPI. Honesto. -->
+          <div class="panel">
+            <div class="panel-eyebrow">Curva V/F &middot; undervolt &middot; ventoinha <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge)">em breve</span></div>
+            <p style="font-size:12.5px;color:var(--ash);margin:0;line-height:1.5">Offset de clock/mem&oacute;ria, <b style="color:var(--chrome)">undervolt</b> (curva tens&atilde;o &times; frequ&ecirc;ncia, ex. 1920&nbsp;MHz @ 900&nbsp;mV) e curva de ventoinha exigem NVAPI em espa&ccedil;o de usu&aacute;rio. Chegam na Fase 2, com o mesmo harness de apply&rarr;testa&rarr;auto-reverte.</p>
+          </div>
+        </div>
+
+        <!-- Ao vivo (real) -->
+        <div class="panel">
+          <div class="panel-eyebrow">Ao vivo <span class="pulse"></span></div>
+          <div class="live">
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg> Temperatura</span><span class="mv neon-ok"><span id="gpu-live-temp">&mdash;</span><span class="u">&deg;C</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg> Uso</span><span class="mv neon-hot"><span id="gpu-live-util">&mdash;</span><span class="u">%</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Clock real</span><span class="mv neon-forge"><span id="gpu-live-clock">&mdash;</span><span class="u">MHz</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0M12 4v8l4 2"/></svg> Ventoinha</span><span class="mv"><span id="gpu-live-fan">&mdash;</span><span class="u">%</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/></svg> VRAM</span><span class="mv neon-cold"><span id="gpu-live-vram">&mdash;</span><span class="u">/8 GB</span></span></div>
+          </div>
+        </div>
+      </div><!-- /vf-grid -->
+
+      <div class="foot-note">Power limit via nvidia-smi em espaço de usuário · nenhum driver de kernel · auto-reverte em 15s se não confirmar · nada é permanente.</div>
+    </section>
+
+    <!-- ========== SISTEMA (transparência / segurança) ========== -->
+    <section class="screen" id="sys">
+      <div class="head">
+        <div class="page-eyebrow">Sistema</div>
+        <h1 class="page-title">Ajustes do sistema</h1>
+        <p class="page-sub">3 itens reduzindo seu desempenho. Você vê exatamente o que cada um muda antes de aplicar.</p>
+      </div>
+
+      <div class="trust-banner">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <div><div class="t">Nada acontece sem você ver</div><div class="s">Cada ajuste mostra o valor antes e depois. Tudo fica registrado e pode ser revertido a qualquer momento.</div></div>
+      </div>
+
+      <!-- Renderizado ao vivo de /api/status → tasks (só as `needed` no SEU PC).
+           Sem cards estáticos: o que aparece aqui é o que a máquina de fato precisa. -->
+      <div id="fix-list" class="fix-list"></div>
+      <div id="fix-empty" class="fix-empty" hidden>
+        <div class="fe-mark"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <div class="fe-t">Nada a forjar</div>
+        <div class="fe-s">Seu sistema já bate todos os alvos seguros do Forge. Volto a avisar se algo regredir.</div>
+      </div>
+
+      <div class="foot-note">Forge é código aberto. Você pode ler exatamente o que cada ajuste faz no GitHub.</div>
+    </section>
+
+    <!-- ========== HARDWARE ========== -->
+    <section class="screen" id="hw">
+      <div class="head">
+        <div class="page-eyebrow">Hardware</div>
+        <h1 class="page-title">Configuração de hardware</h1>
+        <p class="page-sub">CPU, RAM, GPU e discos — tudo que importa, sem bloat.</p>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:18px;grid-template-columns:1fr 1fr">
+
+        <!-- CPU & Memória -->
+        <div class="panel">
+          <div class="panel-eyebrow">Memória RAM</div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+            <span id="hw-ram-mhz" style="font-family:var(--f-display);font-size:32px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">—</span>
+            <span id="hw-ram-mode" style="font-family:var(--f-mono);color:var(--ash);font-size:12px">MHz</span>
+          </div>
+          <div class="fc-diff" style="margin-top:0;margin-bottom:4px">
+            <span id="hw-ram-total" class="chip" style="color:var(--ash)">— GB</span>
+            <span id="hw-ram-usage" class="chip" style="color:var(--ash)">—</span>
+            <span id="hw-ram-xmp" class="chip to">XMP</span>
+          </div>
+
+          <div style="height:1px;background:var(--edge-soft);margin:16px 0"></div>
+          <div class="panel-eyebrow" id="hw-cpu-name" style="margin-bottom:4px">CPU</div>
+
+          <div class="toggle-row" style="padding-top:10px">
+            <div><div class="tl">Precision Boost Overdrive</div><div class="ts">Boost até 4.2GHz · mantenha temps abaixo de 90°C</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+          <div class="toggle-row">
+            <div><div class="tl">Core Parking desativado</div><div class="ts">Todos os 6 núcleos sempre ativos</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+          <div class="toggle-row">
+            <div><div class="tl">Alto desempenho</div><div class="ts">CPU em frequência máxima sob carga</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+        </div>
+
+        <!-- Sistema & NVIDIA -->
+        <div class="panel">
+          <div class="panel-eyebrow">Sistema & NVIDIA</div>
+
+          <div class="toggle-row" style="padding-top:2px">
+            <div><div class="tl">Game Mode</div><div class="ts">Windows prioriza recursos pro jogo ativo</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+          <div class="toggle-row">
+            <div><div class="tl">HAGS</div><div class="ts">Hardware-Accelerated GPU Scheduling</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+          <div class="toggle-row">
+            <div><div class="tl">USB Selective Suspend</div><div class="ts">Desativado — evita micro-stutters</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+          <div class="toggle-row">
+            <div><div class="tl">Nagle's Algorithm</div><div class="ts">Desativado — reduz latência em FPS online</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge);white-space:nowrap">em breve</span>
+          </div>
+
+          <div style="height:1px;background:var(--edge-soft);margin:14px 0"></div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+            <div><div style="font-size:13px">ReBAR</div><div style="font-size:11.5px;color:var(--ash-dim);margin-top:2px">Resizable BAR — leitura via NVAPI planejada</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 10px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge)">em breve</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0 0">
+            <div><div style="font-size:13px">Shader Cache</div><div style="font-size:11.5px;color:var(--ash-dim);margin-top:2px">Limpeza de cache de shaders</div></div>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 10px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge)">em breve</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-eyebrow">Saúde dos discos (S.M.A.R.T.)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash-dim)">
+              <th style="text-align:left;padding:0 14px 12px 0">Disco</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Tipo</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Capacidade</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Uso</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Saúde</th>
+              <th style="text-align:left;padding:0 0 12px 0">Temp</th>
+            </tr></thead>
+            <tbody id="hw-disk-body">
+              <tr><td colspan="6" style="padding:13px 0;color:var(--ash-dim)">Lendo discos…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="foot-note">RAM, CPU e discos: leitura real ao vivo. Ajustes marcados "em breve" ainda não agem — chegam com endpoint dedicado, reversível. Nenhum dado sai do PC.</div>
+    </section>
+
+    <!-- ========== JOGOS ========== -->
+    <section class="screen" id="games">
+      <div class="head">
+        <div class="page-eyebrow">Jogos</div>
+        <h1 class="page-title">Perfis e detecção</h1>
+        <p class="page-sub">Forge detecta qual jogo está aberto e aplica o perfil certo automaticamente.</p>
+      </div>
+
+      <!-- Modo Jogo REAL: liga o vigia do daemon. Detecta um jogo conhecido em execução
+           e ativa o plano de Alto desempenho pela sessão, revertendo ao sair. Os cards
+           abaixo ("Auto Game Profile") ainda são uma prévia visual do solver por jogo. -->
+      <div class="panel" style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <div>
+          <div class="panel-eyebrow" style="margin-bottom:6px">Modo Jogo <span id="gm-status" style="color:var(--ash-dim);font-family:var(--f-mono);font-size:11px">Vigia desligado</span></div>
+          <div style="font-size:13px;color:var(--ash)">Detecta o jogo abrindo e ativa o plano de Alto desempenho pela sessão — revertido automaticamente ao fechar.</div>
+          <div id="gm-active" style="font-size:12px;color:var(--ash-dim);font-family:var(--f-mono);margin-top:8px">—</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:52px;height:28px;flex:none;cursor:pointer">
+          <input type="checkbox" id="gm-toggle" style="opacity:0;width:0;height:0;position:absolute">
+          <span class="gm-track" style="position:absolute;inset:0;border-radius:20px;background:var(--steel-2);border:1px solid var(--edge);transition:.25s"></span>
+          <span class="gm-knob" style="position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--ash);transition:.25s"></span>
+        </label>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <div class="panel-eyebrow">Jogos instalados <span id="games-count" style="color:var(--ash-dim);font-family:var(--f-mono)"></span></div>
+        <div id="games-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div id="games-loading" style="grid-column:1/-1;color:var(--ash-dim);font-size:13px;padding:10px 0">Procurando jogos em Steam e Epic&hellip;</div>
+        </div>
+        <div id="games-empty" style="display:none;color:var(--ash-dim);font-size:13px;padding:10px 0">Nenhum jogo detectado em Steam ou Epic neste PC.</div>
+      </div>
+      <div class="foot-note">Detec&ccedil;&atilde;o real via Steam (libraryfolders) e Epic (manifests). HDD/SSD lido do disco f&iacute;sico. Modo Jogo aplica o preset na sess&atilde;o e reverte ao fechar.</div>
+    </section>
+
+    <!-- ========== MONITOR ========== -->
+    <section class="screen" id="mon">
+      <div class="head">
+        <div class="page-eyebrow">Monitor</div>
+        <h1 class="page-title">Telemetria em tempo real</h1>
+        <p class="page-sub">Atualizado a cada 500ms pelo daemon.</p>
+      </div>
+
+      <div class="arc-row">
+        <!-- FPS gauge: 143/200 = 71.5% → arc=0.715×163.4=116.8 -->
+        <div class="panel arc-widget">
+          <div class="panel-eyebrow" style="align-self:flex-start;width:100%">FPS <span class="pulse" style="margin-left:4px"></span></div>
+          <div class="arc-wrap">
+            <svg viewBox="0 0 120 72" aria-label="FPS 143">
+              <defs>
+                <linearGradient id="ag-fps" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3b4a6b"/>
+                  <stop offset=".6" stop-color="#f97316"/>
+                  <stop offset="1" stop-color="#fcd34d"/>
+                </linearGradient>
+                <filter id="ag-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <path d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="#1c1c20" stroke-width="9" stroke-linecap="round"/>
+              <path id="arc-fps" d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="url(#ag-fps)" stroke-width="9" stroke-linecap="round"
+                    stroke-dasharray="0 163.4" filter="url(#ag-glow)"/>
+              <!-- tick marks -->
+              <line x1="8" y1="68" x2="14" y2="68" stroke="#2a2a30" stroke-width="1.5" transform="rotate(-90 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-45 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-135 60 68)"/>
+            </svg>
+          </div>
+          <div class="arc-readout"><span class="arc-num neon-cold" id="mon-fps">—</span><span class="arc-unit">fps</span></div>
+          <div class="arc-sub" id="mon-fps-sub">sensor indisponível</div>
+        </div>
+
+        <!-- GPU temp gauge: 67/100 = 67% → arc=0.67×163.4=109.5 -->
+        <div class="panel arc-widget">
+          <div class="panel-eyebrow" style="align-self:flex-start;width:100%">GPU temp <span class="pulse" style="margin-left:4px"></span></div>
+          <div class="arc-wrap">
+            <svg viewBox="0 0 120 72" aria-label="GPU 67°C">
+              <defs>
+                <linearGradient id="ag-gpu" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3b4a6b"/>
+                  <stop offset=".5" stop-color="#b8442e"/>
+                  <stop offset="1" stop-color="#f97316"/>
+                </linearGradient>
+              </defs>
+              <path d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="#1c1c20" stroke-width="9" stroke-linecap="round"/>
+              <path id="arc-gpu" d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="url(#ag-gpu)" stroke-width="9" stroke-linecap="round"
+                    stroke-dasharray="0 163.4" filter="url(#ag-glow)"/>
+              <line x1="8" y1="68" x2="14" y2="68" stroke="#2a2a30" stroke-width="1.5" transform="rotate(-90 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-45 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-135 60 68)"/>
+            </svg>
+          </div>
+          <div class="arc-readout"><span class="arc-num neon-cold" id="mon-gpu-temp">—</span><span class="arc-unit">°C</span></div>
+          <div class="arc-sub" id="mon-gpu-sub">lendo…</div>
+        </div>
+
+        <!-- CPU temp gauge: 71/100 = 71% → arc=0.71×163.4=116.0 -->
+        <div class="panel arc-widget">
+          <div class="panel-eyebrow" style="align-self:flex-start;width:100%">CPU temp <span class="pulse" style="margin-left:4px"></span></div>
+          <div class="arc-wrap">
+            <svg viewBox="0 0 120 72" aria-label="CPU 71°C">
+              <defs>
+                <linearGradient id="ag-cpu" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3b4a6b"/>
+                  <stop offset=".55" stop-color="#b8442e"/>
+                  <stop offset="1" stop-color="#f97316"/>
+                </linearGradient>
+              </defs>
+              <path d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="#1c1c20" stroke-width="9" stroke-linecap="round"/>
+              <path id="arc-cpu" d="M8,68 A52,52 0 0 1 112,68" fill="none" stroke="url(#ag-cpu)" stroke-width="9" stroke-linecap="round"
+                    stroke-dasharray="0 163.4" filter="url(#ag-glow)"/>
+              <line x1="8" y1="68" x2="14" y2="68" stroke="#2a2a30" stroke-width="1.5" transform="rotate(-90 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-45 60 68)"/>
+              <line x1="8" y1="68" x2="13" y2="68" stroke="#2a2a30" stroke-width="1" transform="rotate(-135 60 68)"/>
+            </svg>
+          </div>
+          <div class="arc-readout"><span class="arc-num neon-cold" id="mon-cpu-temp">—</span><span class="arc-unit">°C</span></div>
+          <div class="arc-sub" id="mon-cpu-sub">sensor indisponível</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-eyebrow">CPU — carga total <span class="pulse" style="margin-left:4px"></span></div>
+          <!-- Per-core requer endpoint dedicado (ver A2). Por ora: carga total real de /api/monitor. -->
+          <div style="margin-top:8px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+              <span id="mon-cpu-name" style="font-size:12px;color:var(--ash)">—</span>
+              <span id="mon-cpu-load" style="font-family:var(--f-mono);font-size:22px;color:var(--chrome)">—<span style="font-size:13px;color:var(--ash-dim)">%</span></span>
+            </div>
+            <div style="height:10px;border-radius:5px;background:var(--steel-2);overflow:hidden">
+              <div id="mon-cpu-loadbar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ember),var(--forge),var(--hot));transition:width .4s"></div>
+            </div>
+            <div id="mon-cpu-cores" style="font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);margin-top:7px">—</div>
+            <!-- Per-core (A2): uma barra por thread, de /api/monitor cpu.per_core. -->
+            <div id="mon-cpu-percore" style="display:flex;gap:3px;margin-top:10px;align-items:flex-end;height:34px"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-eyebrow">RAM · Disco</div>
+          <div class="live">
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5M10 7V5M14 7V5M18 7V5"/></svg> RAM usada</span><span class="mv" id="mon-ram-used">—<span class="u">GB</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5M10 7V5M14 7V5M18 7V5"/></svg> RAM %</span><span class="mv" id="mon-ram-pct">—<span class="u">%</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8"/><rect x="1" y="16" width="22" height="4" rx="1"/></svg> SSD leitura</span><span class="mv" id="mon-ssd-r" style="color:var(--ash-dim)">—<span class="u">E/S em A2</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8"/><rect x="1" y="16" width="22" height="4" rx="1"/></svg> SSD escrita</span><span class="mv" id="mon-ssd-w" style="color:var(--ash-dim)">—<span class="u">E/S em A2</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <!-- Process Monitor (NZXT CAM–style) -->
+        <div class="panel">
+          <div class="panel-eyebrow">Processos — maior consumo <span class="pulse"></span></div>
+          <div class="proc-head">
+            <span>Processo</span>
+            <span style="text-align:right">CPU</span>
+            <span style="text-align:right">RAM</span>
+            <span style="text-align:right">GPU</span>
+          </div>
+          <div class="proc-list" id="mon-proc-list">
+            <div class="proc-row"><span class="proc-name" style="color:var(--ash-dim)">Lendo processos…</span><span class="proc-val">—</span><span class="proc-val">—</span><span class="proc-val">—</span></div>
+          </div>
+        </div>
+
+        <!-- Sensor Alerts (HWiNFO–style) -->
+        <div class="panel">
+          <div class="panel-eyebrow">Alertas de sensor</div>
+
+          <!-- Card de alerta: renderizado SÓ quando a temp real cruza o limite (ver paintSensorAlert). -->
+          <div class="toast-demo" id="mon-alert" style="margin-bottom:14px;display:none">
+            <div class="td-ic">
+              <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div class="td-title" style="color:#f0a08c" id="mon-alert-title">—</div>
+              <div class="td-sub" id="mon-alert-sub">—</div>
+            </div>
+          </div>
+          <!-- Estado calmo: nenhum alerta. Visível por padrão; o card acima toma o lugar quando dispara. -->
+          <div id="mon-alert-ok" style="display:flex;align-items:center;gap:9px;margin-bottom:14px;padding:11px 13px;border-radius:10px;background:rgba(110,231,168,.07);border:1px solid rgba(110,231,168,.18)">
+            <span class="dot" style="background:#6ee7a8;flex:none"></span>
+            <span style="font-size:13px;color:var(--ash)">Nenhum alerta — sensores dentro do limite</span>
+          </div>
+
+          <div class="toast-label">Limites configurados</div>
+          <div class="proc-list">
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">GPU temperatura</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">85°C</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:#f0a08c">Ativo</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">CPU temperatura</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">90°C</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">VRAM uso</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">90%</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">RAM uso</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">85%</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+          </div>
+          <button class="btn-ghost" style="margin-top:14px;width:100%;justify-content:center;display:flex">Configurar alertas</button>
+        </div>
+      </div>
+
+      <div class="foot-note">Daemon coleta a cada 500ms. Zero overhead em jogo — pipe local, sem rede.</div>
+    </section>
+
+    <!-- ========== HISTÓRICO ========== -->
+    <section class="screen" id="hist">
+      <div class="head">
+        <div class="page-eyebrow">Histórico</div>
+        <h1 class="page-title">Evolução do seu PC</h1>
+        <p class="page-sub">Linha do tempo do score do estado cru até hoje.</p>
+      </div>
+
+      <!-- Banner honesto: histórico real precisa do score_history (SQLite, ver spec §7).
+           Enquanto não existe, esta tela é uma DEMONSTRAÇÃO com números de exemplo. -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:12px 15px;border-radius:10px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.22)">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--forge)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span style="font-size:13px;color:var(--ash)"><b style="color:var(--chrome)">Demonstração.</b> O histórico real começa a ser gravado quando o registro de score (SQLite) entrar. Os números abaixo são exemplo.</span>
+      </div>
+
+      <!-- before/after card (números de exemplo) -->
+      <div style="margin-bottom:20px;padding:28px;border-radius:var(--r-card);background:var(--anvil);border:1px solid var(--edge-soft);position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(59,74,107,.25),transparent 60%),radial-gradient(ellipse at 70% 50%,rgba(252,211,77,.1),transparent 55%);pointer-events:none"></div>
+        <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:20px">Card antes/depois · exportável em PNG</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:48px">
+          <div style="text-align:center">
+            <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash-dim);margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase">Dia 0</div>
+            <div style="font-family:var(--f-display);font-size:72px;font-weight:600;line-height:1;color:#3b4a6b">34</div>
+            <div style="font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:4px">/ 100</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+            <svg width="48" height="16" viewBox="0 0 48 16" fill="none"><path d="M0 8h40M33 2l8 6-8 6" stroke="#5f5f67" stroke-width="2" stroke-linecap="round"/></svg>
+            <div style="font-family:var(--f-mono);font-size:12px;color:#6ee7a8;font-weight:600">+57 pts</div>
+            <div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim)">14 dias</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash-dim);margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase">Hoje</div>
+            <div style="font-family:var(--f-display);font-size:72px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">91</div>
+            <div style="font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:4px">/ 100</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:24px;border-top:1px solid var(--edge-soft);padding-top:20px">
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Sistema</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+30</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Hardware</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+9</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">GPU</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+18</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Jogos</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+12</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Monitor</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+0</div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px">
+          <button class="btn-apply" style="display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a0e00" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar card (PNG)
+          </button>
+        </div>
+      </div>
+
+      <!-- full timeline -->
+      <div class="panel">
+        <div class="panel-eyebrow">Linha do tempo completa · 14 dias</div>
+        <svg width="100%" height="180" viewBox="0 0 800 180" preserveAspectRatio="none" aria-label="Histórico de score">
+          <defs>
+            <linearGradient id="fill2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f97316" stop-opacity=".3"/><stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="line2" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#3b4a6b"/><stop offset=".5" stop-color="#f97316"/><stop offset="1" stop-color="#fcd34d"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,155 L57,145 L114,128 L171,115 L228,95 L285,78 L342,62 L400,42 L457,98 L514,80 L571,56 L628,40 L685,30 L742,24 L800,20 L800,180 L0,180 Z" fill="url(#fill2)"/>
+          <path d="M0,155 L57,145 L114,128 L171,115 L228,95 L285,78 L342,62 L400,42 L457,98 L514,80 L571,56 L628,40 L685,30 L742,24 L800,20" fill="none" stroke="url(#line2)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <!-- WU event marker -->
+          <line x1="457" y1="0" x2="457" y2="180" stroke="rgba(212,84,58,.3)" stroke-width="1" stroke-dasharray="4,4"/>
+          <circle cx="457" cy="98" r="5" fill="#d4543a" stroke="#141416" stroke-width="2"/>
+          <circle cx="800" cy="20" r="5.5" fill="#fcd34d" stroke="#141416" stroke-width="2"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:8px">
+          <span>06/06 · 34pts</span><span style="color:var(--danger)">15/06 · Windows Update</span><span>20/06 · 91pts</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // screen switching
+  const items=document.querySelectorAll('.nav-item[data-screen]');
+  const screens=document.querySelectorAll('.screen');
+  // deep-link: ?screen=gpu activates a screen on load; invalid id falls back to default
+  const wanted=new URLSearchParams(location.search).get('screen');
+  const validIds=new Set([...screens].map(s=>s.id));
+  if(wanted && validIds.has(wanted)){
+    screens.forEach(s=>s.classList.toggle('active',s.id===wanted));
+    items.forEach(i=>i.classList.toggle('active',i.dataset.screen===wanted));
+  }
+  items.forEach(it=>it.addEventListener('click',e=>{
+    e.preventDefault();
+    const id=it.dataset.screen;
+    items.forEach(i=>i.classList.toggle('active',i===it));
+    screens.forEach(s=>s.classList.toggle('active',s.id===id));
+    window.scrollTo({top:0,behavior:'instant'});
+  }));
+  // toggles
+  document.querySelectorAll('.switch').forEach(s=>{
+    const flip=()=>{const on=s.classList.toggle('on');s.setAttribute('aria-checked',on);};
+    s.addEventListener('click',flip);
+    s.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();flip();}});
+  });
+  // live range fill
+  document.querySelectorAll('input[type=range]').forEach(r=>{
+    const paint=()=>{const p=(r.value-r.min)/(r.max-r.min)*100;
+      r.style.background=`linear-gradient(90deg,var(--ember),var(--forge) ${p}%,var(--steel-2) ${p}%)`;};
+    paint(); r.addEventListener('input',paint);
+  });
+
+  // ==========================================
+  // LED BARS
+  // ==========================================
+  (function(){
+    function makeLed(pct,n=20){
+      const lit=Math.round(pct/100*n);
+      // barra INTEIRA na temperatura da nota (não na posição do segmento)
+      const base=pct>=85?'s-hot':pct>=60?'s-forge':pct>=35?'s-ember':'s-cold';
+      const tip={'s-cold':'s-ember','s-ember':'s-forge','s-forge':'s-hot','s-hot':'s-hot'}[base];
+      return Array.from({length:n},(_,i)=>{
+        if(i>=lit) return '<span class="led-seg"></span>';
+        const c=(i>=lit-2)?tip:base;   // ponta incandescente
+        return `<span class="led-seg ${c}"></span>`;
+      }).join('');
+    }
+    document.querySelectorAll('.cat .track[data-pct]').forEach(el=>{
+      el.style.cssText='background:none;overflow:visible;height:auto;border-radius:0';
+      el.innerHTML=`<div class="led-bar">${makeLed(+el.dataset.pct)}</div>`;
+    });
+  })();
+
+  // ==========================================
+  // V/F CURVE EDITOR
+  // ==========================================
+  (function(){
+    const svg=document.getElementById('vfSvg');
+    if(!svg) return;
+
+    // Coordinate bounds
+    const X0=56,X1=560,Y0=20,Y1=224;
+    const VoltMin=800,VoltMax=1100,FreqMin=1400,FreqMax=2100;
+
+    // Default node positions (cx, cy in SVG coords)
+    const defaults=[[56,195],[98,151],[140,113],[182,84],[224,64],[266,56],[308,55],[392,55],[476,55],[560,55]];
+    let nodes=defaults.map(d=>[...d]);
+
+    // Convert SVG coords to physical values
+    const toVolt=x=>Math.round(VoltMin+(x-X0)/(X1-X0)*(VoltMax-VoltMin));
+    const toFreq=y=>Math.round(FreqMax-(y-Y0)/(Y1-Y0)*(FreqMax-FreqMin));
+
+    const circles=Array.from(svg.querySelectorAll('.vf-node'));
+    const line=document.getElementById('vfLine');
+    const fill=document.getElementById('vfFill');
+    const status=document.getElementById('curveStatus');
+
+    function clampX(x,i){
+      const lo=i===0?X0:nodes[i-1][0]+2;
+      const hi=i===nodes.length-1?X1:nodes[i+1][0]-2;
+      return Math.max(lo,Math.min(hi,x));
+    }
+    function clampY(y){return Math.max(Y0+2,Math.min(Y1-2,y));}
+
+    function updateSvg(){
+      const pts=nodes.map(n=>n.join(',')).join(' ');
+      line.setAttribute('points',pts);
+      fill.setAttribute('points',pts+` ${X1},${Y1} ${X0},${Y1}`);
+      circles.forEach((c,i)=>{
+        c.setAttribute('cx',nodes[i][0]);
+        c.setAttribute('cy',nodes[i][1]);
+        const v=toVolt(nodes[i][0]),f=toFreq(nodes[i][1]);
+        c.setAttribute('aria-label',`${v}mV ${f}MHz`);
+      });
+    }
+
+    function updateStatus(i){
+      const v=toVolt(nodes[i][0]),f=toFreq(nodes[i][1]);
+      if(status) status.textContent=`Ponto ${i+1}: ${v}mV · ${f}MHz`;
+    }
+
+    // Drag logic
+    let dragging=null;
+    function svgPt(e){
+      const pt=svg.createSVGPoint();
+      const src=e.touches?e.touches[0]:e;
+      pt.x=src.clientX; pt.y=src.clientY;
+      const ctm=svg.getScreenCTM();
+      if(!ctm) return pt;
+      return pt.matrixTransform(ctm.inverse());
+    }
+
+    circles.forEach((c,i)=>{
+      const startDrag=e=>{
+        e.preventDefault();
+        dragging=i;
+        c.style.r='9';
+      };
+      c.addEventListener('mousedown',startDrag);
+      c.addEventListener('touchstart',startDrag,{passive:false});
+
+      // Keyboard: arrows nudge by 1 unit
+      c.addEventListener('keydown',e=>{
+        const step=e.shiftKey?5:1;
+        let [x,y]=nodes[i];
+        if(e.key==='ArrowLeft'){x=clampX(x-step,i);}
+        else if(e.key==='ArrowRight'){x=clampX(x+step,i);}
+        else if(e.key==='ArrowUp'){y=clampY(y-step);}
+        else if(e.key==='ArrowDown'){y=clampY(y+step);}
+        else return;
+        e.preventDefault();
+        nodes[i]=[x,y];
+        updateSvg();
+        updateStatus(i);
+      });
+    });
+
+    const onMove=e=>{
+      if(dragging===null) return;
+      e.preventDefault();
+      const pt=svgPt(e);
+      const x=clampX(pt.x,dragging);
+      const y=clampY(pt.y);
+      nodes[dragging]=[x,y];
+      updateSvg();
+      updateStatus(dragging);
+    };
+    const onUp=()=>{
+      if(dragging!==null){circles[dragging].style.r='';dragging=null;}
+    };
+    svg.addEventListener('mousemove',onMove);
+    svg.addEventListener('touchmove',onMove,{passive:false});
+    // window-level so drag tracking works when pointer leaves SVG bounds
+    const dragAC=new AbortController();
+    window.addEventListener('mouseup',onUp,{signal:dragAC.signal});
+    window.addEventListener('touchend',onUp,{signal:dragAC.signal});
+
+    // Flatten tail — set all nodes from elbow rightward to same Y
+    document.getElementById('flattenBtn')?.addEventListener('click',()=>{
+      let elbowIdx=0;
+      for(let i=1;i<nodes.length;i++){
+        if(Math.abs(nodes[i][1]-nodes[i-1][1])>6){elbowIdx=i;}
+      }
+      const flatY=nodes[elbowIdx][1];
+      const needsFlatten=nodes.slice(elbowIdx).some(n=>n[1]!==flatY);
+      if(!needsFlatten){
+        if(status) status.textContent='Cauda já está nivelada';
+        return;
+      }
+      for(let i=elbowIdx;i<nodes.length;i++) nodes[i][1]=flatY;
+      updateSvg();
+      if(status) status.textContent='Cauda travada — plateau aplicado';
+    });
+
+    // Reset curve
+    document.getElementById('resetCurveBtn')?.addEventListener('click',()=>{
+      nodes=defaults.map(d=>[...d]);
+      updateSvg();
+      if(status) status.textContent='Curva restaurada ao padrão';
+    });
+
+    // Profile chips — scoped to GPU section to avoid conflicts with other .chip-btn elements
+    const profiles={
+      gaming:[[56,195],[98,151],[140,113],[182,84],[224,64],[266,56],[308,55],[392,55],[476,55],[560,55]],
+      silent:[[56,209],[98,180],[140,152],[182,130],[224,115],[266,108],[308,106],[392,106],[476,106],[560,106]],
+      turbo: [[56,185],[98,138],[140,98],[182,68],[224,46],[266,40],[308,38],[392,38],[476,38],[560,38]],
+      custom1:null,custom2:null
+    };
+    const gpuSection=document.getElementById('gpu');
+    gpuSection?.querySelectorAll('.chip-btn[data-profile]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        gpuSection.querySelectorAll('.chip-btn').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        const p=profiles[btn.dataset.profile];
+        if(p){nodes=p.map(d=>[...d]);updateSvg();}
+      });
+    });
+
+    // Auto-tune (demo animation)
+    document.getElementById('autotuneBtn')?.addEventListener('click',function(){
+      this.disabled=true;
+      this.textContent='Analisando...';
+      let t=0;
+      const anim=setInterval(()=>{
+        t++;
+        nodes.forEach((n,i)=>{
+          n[1]=Math.max(Y0+2,Math.min(Y1-2,n[1]+(Math.random()-0.5)*10));
+        });
+        updateSvg();
+        if(t>18){
+          clearInterval(anim);
+          nodes=profiles.gaming.map(d=>[...d]);
+          updateSvg();
+          if(status) status.textContent='Auto-tune: perfil Gaming otimizado aplicado';
+          this.disabled=false;
+          this.innerHTML=`<svg viewBox="0 0 24 24" width="16" height="16" stroke="var(--hot)" stroke-width="1.8" fill="none"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> Otimizar automaticamente`;
+        }
+      },60);
+    });
+
+    updateSvg();
+  })();
+</script>
+
+<!-- Forge live data — ForgeSentinel serve on :5172 feeds real scores into the mockup -->
+<script>
+(function(){
+  // When the daemon serves this page (http://127.0.0.1:5172) we talk same-origin
+  // and read the per-process CSRF token it injected. Opened as a file:// during
+  // dev, BASE points at the loopback daemon but there's no token, so read-only
+  // status works while /api/restore is correctly refused until opened via the
+  // served URL.
+  const TOKEN=document.querySelector('meta[name="forge-token"]')?.content||'';
+  const BASE=location.protocol==='http:'?'':'http://127.0.0.1:5172';
+  const API=BASE+'/api/status';
+  function makeLed(pct,n=20){
+    const lit=Math.round(pct/100*n);
+    // barra INTEIRA na temperatura da nota (não na posição do segmento)
+    const base=pct>=85?'s-hot':pct>=60?'s-forge':pct>=35?'s-ember':'s-cold';
+    const tip={'s-cold':'s-ember','s-ember':'s-forge','s-forge':'s-hot','s-hot':'s-hot'}[base];
+    return Array.from({length:n},(_,i)=>{
+      if(i>=lit) return '<span class="led-seg"></span>';
+      const c=(i>=lit-2)?tip:base;   // ponta incandescente
+      return `<span class="led-seg ${c}"></span>`;
+    }).join('');
+  }
+  function setCat(el,pct){
+    const track=el.querySelector('.track');
+    const valEl=el.querySelector('.val');
+    if(track){
+      track.dataset.pct=pct>=0?pct:0;
+      track.style.cssText='background:none;overflow:visible;height:auto;border-radius:0';
+      const opacity=pct<0?'opacity:.25;':'';
+      track.innerHTML=`<div class="led-bar" style="${opacity}">${makeLed(Math.max(0,pct))}</div>`;
+    }
+    if(valEl){
+      const node=valEl.firstChild;
+      if(node) node.textContent=pct>=0?pct:'—';
+      valEl.style.color=pct>=0?scoreText(pct):'var(--ash-dim)';  // número acompanha a barra
+    }
+  }
+  // ---- forge temperature: whole accent palette slides cold→hot with the score ----
+  const FORGE_RAMP=[
+    {t:0.00, ember:[30,58,138],  forge:[59,130,246], hot:[147,197,253]}, // frio · azul metálico
+    {t:0.30, ember:[40,70,120],  forge:[90,120,165], hot:[150,180,220]}, // steel · segura o azul (sem virar marrom)
+    {t:0.45, ember:[184,68,46],  forge:[249,115,22], hot:[252,211,77]},  // laranja brasa
+    {t:0.72, ember:[194,65,12],  forge:[251,146,60], hot:[253,224,71]},  // brasa quente
+    {t:1.00, ember:[217,119,6],  forge:[251,191,36], hot:[255,243,196]}, // dourado incandescente
+  ];
+  const lerp=(a,b,k)=>Math.round(a+(b-a)*k);
+  function rampColor(key,t){
+    let lo=FORGE_RAMP[0],hi=FORGE_RAMP[FORGE_RAMP.length-1];
+    for(let i=0;i<FORGE_RAMP.length-1;i++){
+      if(t>=FORGE_RAMP[i].t && t<=FORGE_RAMP[i+1].t){lo=FORGE_RAMP[i];hi=FORGE_RAMP[i+1];break;}
+    }
+    const k=hi.t===lo.t?0:(t-lo.t)/(hi.t-lo.t);
+    return [0,1,2].map(j=>lerp(lo[key][j],hi[key][j],k));
+  }
+  function setForgeTemp(score){
+    const t=Math.max(0,Math.min(1,(score||0)/100));
+    const fg=rampColor('forge',t);
+    const s=document.documentElement.style;
+    s.setProperty('--ember',`rgb(${rampColor('ember',t).join(',')})`);
+    s.setProperty('--forge',`rgb(${fg.join(',')})`);
+    s.setProperty('--hot',  `rgb(${rampColor('hot',t).join(',')})`);
+    s.setProperty('--forge-rgb',fg.join(','));
+  }
+
+  // ---- nota → cor: rampa de forja (azul frio → brasa → forja → ouro) ----
+  // cada barra/nota pintada pela SUA própria nota, não pelo score global
+  const SCORE_STOPS=[
+    {t:0,  c:[59,74,107]},   // #3b4a6b azul frio
+    {t:40, c:[184,68,46]},   // #b8442e brasa
+    {t:70, c:[249,115,22]},  // #f97316 forja
+    {t:100,c:[252,211,77]},  // #fcd34d ouro incandescente
+  ];
+  // variante p/ texto: mesma temperatura, mas legível no fundo escuro
+  const SCORE_TEXT=[
+    {t:0,  c:[124,147,214]}, // azul aço claro
+    {t:40, c:[224,101,63]},  // brasa clara
+    {t:70, c:[249,115,22]},  // forja
+    {t:100,c:[252,211,77]},  // ouro
+  ];
+  function rampOf(stops,score){
+    const v=Math.max(0,Math.min(100,score||0));
+    let lo=stops[0],hi=stops[stops.length-1];
+    for(let i=0;i<stops.length-1;i++){
+      if(v>=stops[i].t && v<=stops[i+1].t){lo=stops[i];hi=stops[i+1];break;}
+    }
+    const k=hi.t===lo.t?0:(v-lo.t)/(hi.t-lo.t);
+    const m=j=>Math.round(lo.c[j]+(hi.c[j]-lo.c[j])*k);
+    return [m(0),m(1),m(2)];
+  }
+  const scoreColor=s=>{const[r,g,b]=rampOf(SCORE_STOPS,s);return`rgb(${r},${g},${b})`;};
+  const scoreText =s=>{const[r,g,b]=rampOf(SCORE_TEXT ,s);return`rgb(${r},${g},${b})`;};
+  function paintScoreBars(root=document){
+    root.querySelectorAll('.dcat').forEach(d=>{
+      const fill=d.querySelector('.dcat-fill');
+      const val =d.querySelector('.dcat-val');
+      const score=parseInt((val?.textContent||'').trim(),10);
+      if(isNaN(score)) return;
+      const [r,g,b]=rampOf(SCORE_STOPS,score);
+      if(fill){
+        fill.style.background=`rgb(${r},${g},${b})`;          // barra inteira = temperatura da nota
+        fill.style.boxShadow=`0 0 8px rgba(${r},${g},${b},.55)`;
+      }
+      if(val) val.style.color=scoreText(score);               // número acompanha a barra
+    });
+  }
+  // arco do gauge: ancora a varredura na temperatura da nota (sem azul salvo nota baixa)
+  function paintArc(score){
+    const map={hs0:.42, hs1:.62, hs2:.85, hs3:1};
+    for(const id in map){
+      const st=document.getElementById(id);
+      if(st) st.setAttribute('stop-color',scoreColor(score*map[id]));
+    }
+  }
+
+  function apply(d){
+    setForgeTemp(d.global);
+    paintArc(d.global);
+    const numEl=document.querySelector('.gauge-num');
+    if(numEl) numEl.textContent=d.global;
+    const arc=document.getElementById('arc');
+    if(arc) arc.setAttribute('stroke-dasharray',`${(d.global/100*565.5).toFixed(1)} 753.98`);
+    const tier=document.querySelector('.gauge-tier');
+    if(tier){tier.textContent=d.tier;tier.style.color=d.tier_color;tier.style.borderColor=d.tier_color+'55';}
+    const cats=document.querySelectorAll('.cats .cat');
+    const keys=['sistema','hardware','gpu','jogos','monitor'];
+    cats.forEach((c,i)=>setCat(c,d.categories[keys[i]]));
+    // ---- cabeia as barras de categoria do dash à data viva do daemon ----
+    const CAT_KEY={'Sistema':'sistema','Hardware':'hardware','GPU':'gpu','Jogos':'jogos','Sentinel':'sentinel','Monitor':'monitor'};
+    document.querySelectorAll('#dash .dcat').forEach(row=>{
+      const nm=row.querySelector('.dcat-name')?.textContent.trim();
+      const key=CAT_KEY[nm];
+      if(!key || d.categories[key]===undefined) return;
+      const sc=d.categories[key];
+      const fill=row.querySelector('.dcat-fill');
+      const val =row.querySelector('.dcat-val');
+      if(sc<0){                                   // -1 = aspecto não medido
+        if(fill){fill.style.width='0%';fill.style.background='var(--steel-2)';fill.style.boxShadow='none';}
+        if(val){val.textContent='—';val.style.color='var(--ash-dim)';}
+      }else{
+        if(fill) fill.style.width=sc+'%';
+        if(val)  val.textContent=sc;
+      }
+    });
+    paintScoreBars();                             // recolore barras+números pela nota viva
+    const sub=document.querySelector('#dash .page-sub');
+    if(sub) sub.textContent=d.regressions>0
+      ?`${d.regressions} regressão(ões) detectada(s) pelo Sentinel — execute: ForgeSentinel restore --apply`
+      :'Sistema alinhado com o baseline. Score calculado com dados reais do seu PC.';
+    document.querySelector('.bar-right').textContent=`v1.0.0 · score ${d.global} · ${d.power_plan}`;
+    renderTasks(d.tasks);
+    reflectGameMode(d);
+    maybeOpenWizard(d);
+  }
+  // ---- Central de Correções: cards reais, vindos de /api/status → tasks ----
+  // Renderiza SÓ as tarefas com needed=true (estado real do PC ≠ alvo). Zero estático.
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  function renderTasks(tasks){
+    const list=document.getElementById('fix-list');
+    const empty=document.getElementById('fix-empty');
+    const sub=document.querySelector('#sys .page-sub');
+    if(!list) return;
+    const needed=Array.isArray(tasks)?tasks.filter(t=>t&&t.needed):[];
+    renderDashTasks(needed);          // Painel: mesma fonte viva que a tela Sistema
+    updateNavBadge(needed.length);    // badge do sidebar reflete o real, some no zero
+    if(needed.length===0){
+      list.innerHTML='';
+      if(empty) empty.hidden=false;
+      if(sub) sub.textContent='Nenhum ajuste pendente — seu PC já bate os alvos seguros do Forge.';
+      return;
+    }
+    if(empty) empty.hidden=true;
+    if(sub) sub.textContent=`${needed.length} ${needed.length===1?'item reduzindo':'itens reduzindo'} seu desempenho. Você vê exatamente o que cada um muda antes de aplicar.`;
+    const revSvg='<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
+    list.innerHTML=needed.map(t=>`
+      <div class="fix-card">
+        <div class="fc-top">
+          <span class="fc-sev ${t.sev==='crit'?'crit':'warn'}"></span>
+          <div class="fc-main">
+            <div class="fc-title">${esc(t.title)}</div>
+            <div class="fc-why">${esc(t.why)}</div>
+            <div class="fc-diff">
+              <span class="chip from">${esc(t.from_label)}</span>
+              <span class="arrow">→</span>
+              <span class="chip to">${esc(t.to_label)}</span>
+            </div>
+            <div class="reversible">${revSvg} Reversível · registrado em fix_log</div>
+          </div>
+          <div class="fc-actions"><button class="mini-btn" data-apply="${esc(t.id)}">Aplicar</button></div>
+        </div>
+      </div>`).join('');
+  }
+  // ---- Painel "Ajustes pendentes": mesma fonte viva da tela Sistema ----
+  // Render compacto (estilo .issue) dos MESMOS tasks needed. Mata a contradição
+  // entre a primeira tela e a tela Sistema; antes era HTML chumbado.
+  function renderDashTasks(needed){
+    const list =document.getElementById('dash-fix-list');
+    const empty=document.getElementById('dash-fix-empty');
+    const acts =document.getElementById('dash-fix-actions');
+    const count=document.getElementById('dash-fix-count');
+    const sub  =document.querySelector('#dash .page-sub-right, #dash .page-sub');
+    if(!list) return;
+    if(count) count.textContent=needed.length;
+    const title=document.getElementById('dash-topbar-title');
+    const note =document.getElementById('dash-topbar-note');
+    if(needed.length===0){
+      list.innerHTML='';
+      if(empty) empty.hidden=false;
+      if(acts)  acts.style.display='none';   // [hidden] perde pro display:flex inline
+      if(title) title.textContent='Seu PC está forjado';
+      if(note)  note.textContent='Nenhum ajuste pendente — está no ponto';
+      return;
+    }
+    if(title) title.textContent='Quase no ponto';
+    if(note)  note.textContent=`${needed.length} ${needed.length===1?'ajuste pendente':'ajustes pendentes'} — corrija para chegar aos 100`;
+    if(empty) empty.hidden=true;
+    if(acts)  acts.style.display='flex';
+    const sevCls=s=>s==='crit'?'crit':s==='warn'?'warn':'info';
+    list.innerHTML=needed.map(t=>`
+      <div class="issue">
+        <span class="dot ${sevCls(t.sev)}"></span>
+        <div class="txt"><div class="t">${esc(t.title)}</div><div class="s">${esc(t.from_label)} → ${esc(t.to_label)}</div></div>
+        <button class="mini-btn" data-apply="${esc(t.id)}">Corrigir</button>
+      </div>`).join('');
+  }
+  // Badge do sidebar (nav Sistema): reflete a contagem real, some quando zero.
+  function updateNavBadge(n){
+    const b=document.getElementById('nav-sys-badge');
+    if(!b) return;
+    b.textContent=n;
+    b.hidden=(n===0);
+  }
+  // ---- Modo Jogo: espelha o estado real do daemon no painel ----
+  function reflectGameMode(d){
+    const tgl=document.getElementById('gm-toggle');
+    const st =document.getElementById('gm-status');
+    const gm =document.getElementById('gm-active');
+    if(tgl && d.game_mode!==undefined) tgl.checked=!!d.game_mode;
+    if(st)  st.textContent = d.game_mode ? 'Vigia ligado' : 'Vigia desligado';
+    if(st)  st.style.color = d.game_mode ? '#6ee7a8' : 'var(--ash-dim)';
+    if(gm){
+      if(d.active_game){gm.textContent='Otimizando: '+d.active_game;gm.style.color='var(--hot)';}
+      else{gm.textContent=d.game_mode?'Nenhum jogo em execução':'—';gm.style.color='var(--ash-dim)';}
+    }
+    paintToggle(!!d.game_mode);
+  }
+  // Pinta o switch do Modo Jogo (inline style não cobre :checked).
+  function paintToggle(on){
+    const tgl=document.getElementById('gm-toggle');
+    const lab=tgl?tgl.closest('label'):null;
+    if(!lab) return;
+    const track=lab.querySelector('.gm-track'), knob=lab.querySelector('.gm-knob');
+    if(track){track.style.background=on?'rgba(34,197,94,.35)':'var(--steel-2)';track.style.borderColor=on?'rgba(34,197,94,.6)':'var(--edge)';}
+    if(knob){knob.style.left=on?'28px':'3px';knob.style.background=on?'#6ee7a8':'var(--ash)';}
+  }
+  // ---- feedback banner ----
+  let bannerEl=null;
+  function showBanner(msg,type){
+    if(!bannerEl){
+      bannerEl=document.createElement('div');
+      bannerEl.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:999;padding:11px 22px;border-radius:10px;font-size:13.5px;font-family:var(--f-ui);font-weight:500;transition:.3s;pointer-events:none';
+      document.body.appendChild(bannerEl);
+    }
+    bannerEl.textContent=msg;
+    bannerEl.style.background=type==='ok'?'rgba(34,197,94,.18)':'rgba(212,84,58,.18)';
+    bannerEl.style.border='1px solid '+(type==='ok'?'rgba(34,197,94,.4)':'rgba(212,84,58,.4)');
+    bannerEl.style.color=type==='ok'?'#6ee7a8':'#f0a08c';
+    bannerEl.style.opacity='1';
+    clearTimeout(bannerEl._t);
+    bannerEl._t=setTimeout(()=>{bannerEl.style.opacity='0';},3500);
+  }
+
+  // ---- apply action ----
+  async function doRestore(btn){
+    const orig=btn.innerHTML;
+    btn.disabled=true;btn.style.opacity='.5';
+    try{
+      const r=await fetch(BASE+'/api/restore',{method:'POST',headers:{'Security-Token':TOKEN},signal:AbortSignal.timeout(5000)});
+      const d=await r.json();
+      if(r.status===403) showBanner('Admin necessário — reinicie: ForgeSentinel serve (como Administrador)','err');
+      else if(d.total===0) showBanner('Nada a restaurar — sistema já bate com o baseline','ok');
+      else showBanner(`${d.applied}/${d.total} aplicado(s) com sucesso`,'ok');
+      // refresh score
+      fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+    }catch{
+      showBanner('Daemon offline — rode: ForgeSentinel serve','err');
+    }
+    btn.disabled=false;btn.style.opacity='';btn.innerHTML=orig;
+  }
+
+  // Forward optimization. Sends ONLY a fixed action id; the daemon maps it to a
+  // hardcoded (kind,target) — the UI never sends a value to write.
+  async function postApply(id){
+    const r=await fetch(BASE+'/api/apply',{method:'POST',
+      headers:{'Security-Token':TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({id}),signal:AbortSignal.timeout(8000)});
+    return {status:r.status, data:await r.json().catch(()=>({}))};
+  }
+  async function doApply(btn,id){
+    const orig=btn.innerHTML;
+    btn.disabled=true;btn.style.opacity='.5';
+    try{
+      const {status,data}=await postApply(id);
+      if(status===403) showBanner('Admin necessário — reinicie: ForgeSentinel serve (como Administrador)','err');
+      else if(status===400) showBanner('Ação desconhecida','err');
+      else if(data.already) showBanner('Já está no ponto — nada a forjar','ok');
+      else if(data.applied>0) showBanner('Otimização aplicada — reversível pelo histórico','ok');
+      else showBanner('Não foi possível aplicar','err');
+      fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+    }catch{
+      showBanner('Daemon offline — rode: ForgeSentinel serve','err');
+    }
+    btn.disabled=false;btn.style.opacity='';btn.innerHTML=orig;
+  }
+  // "Sopro da Forja" / "Forjar tudo": aplica o conjunto seguro inteiro de uma vez.
+  // Server-side atômico (/api/quick): UM ponto de restauração e UM batch de auditoria,
+  // então um único `undo` reverte o sopro completo. Sem botão (btn opcional) pode ser
+  // chamada pelo tray via ExecuteScript — por isso vive no window.
+  async function forgeQuick(btn){
+    const orig=btn?btn.innerHTML:null;
+    if(btn){btn.disabled=true;btn.style.opacity='.5';}
+    try{
+      const r=await fetch(BASE+'/api/quick',{method:'POST',
+        headers:{'Security-Token':TOKEN},signal:AbortSignal.timeout(15000)});
+      const d=await r.json().catch(()=>({}));
+      if(r.status===403) showBanner('Admin necessário — reinicie a Forja como Administrador','err');
+      else if(d.applied>0) showBanner(`Sopro da Forja: ${d.applied} otimização(ões) aplicada(s) — reversível`,'ok');
+      else if(d.already>0 && d.applied===0) showBanner('Tudo já no ponto — a forja está quente','ok');
+      else showBanner('Nada a forjar','ok');
+      fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+    }catch{
+      showBanner('Daemon offline — rode: ForgeSentinel serve','err');
+    }
+    if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=orig;}
+  }
+  window.forgeQuick=forgeQuick;
+
+  // Liga/desliga o Modo Jogo automático no daemon. Também exposto no window pro tray.
+  async function forgeGameMode(enabled){
+    try{
+      const r=await fetch(BASE+'/api/gamemode',{method:'POST',
+        headers:{'Security-Token':TOKEN,'Content-Type':'application/json'},
+        body:JSON.stringify({enabled:!!enabled}),signal:AbortSignal.timeout(5000)});
+      const d=await r.json().catch(()=>({}));
+      if(r.status===403){showBanner('Admin necessário — reinicie a Forja como Administrador','err');return false;}
+      showBanner(d.enabled?'Modo Jogo ligado — otimizo quando um jogo abrir':'Modo Jogo desligado','ok');
+      fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+      return !!d.enabled;
+    }catch{
+      showBanner('Daemon offline — rode: ForgeSentinel serve','err');
+      return false;
+    }
+  }
+  window.forgeGameMode=forgeGameMode;
+
+  // ============== Wizard de boas-vindas (primeiro uso) ==============
+  // 4 passos com dados REAIS do daemon + finale que crava o baseline. Não-modal:
+  // pular/fechar/reabrir a qualquer hora. Acessível: foco confinado, Esc fecha,
+  // aria-live nos passos. Passo 4 (jogos) é honesto — scanner é fase B, sem fake.
+  const FW={i:0,total:4,ram:null,status:null,lastFocus:null};
+
+  async function fwGetStatus(){
+    try{const r=await fetch(API,{signal:AbortSignal.timeout(4000)});return await r.json();}catch{return null;}
+  }
+  async function fwGetRam(){
+    try{const r=await fetch(BASE+'/api/ram',{signal:AbortSignal.timeout(6000)});return await r.json();}catch{return null;}
+  }
+  async function fwCaptureBaseline(){
+    try{
+      const r=await fetch(BASE+'/api/baseline',{method:'POST',
+        headers:{'Security-Token':TOKEN,'Content-Type':'application/json'},body:'{}',
+        signal:AbortSignal.timeout(6000)});
+      return {status:r.status,data:await r.json().catch(()=>({}))};
+    }catch{return {status:0,data:{}};}
+  }
+
+  // ---- conteúdo de cada passo (HTML string, dados reais) ----
+  async function fwStep1(){
+    const d=FW.status=await fwGetStatus();
+    if(!d) return `<div class="fw-note">Não consegui falar com o daemon. Rode <b>ForgeSentinel serve</b> e reabra o assistente.</div>`;
+    const cats=[['Sistema',d.categories.sistema],['Hardware',d.categories.hardware],['Sentinel',d.categories.sentinel]];
+    const rows=cats.map(([n,v])=>`<div class="fw-stat"><span class="k">${n}</span><span class="v">${v}/100</span></div>`).join('');
+    return `
+      <div style="display:flex;align-items:center;gap:18px;margin-bottom:6px">
+        <div class="fw-gauge" style="color:${esc(d.tier_color)}">${d.global}</div>
+        <div><div class="fw-pill ${d.global>=70?'ok':'warn'}">${esc(d.tier)}</div>
+        <div style="font-size:12.5px;color:var(--ash-dim);margin-top:6px">${d.power_plan}</div></div>
+      </div>
+      ${rows}
+      <div class="fw-note">Tudo lido localmente — registro, energia e serviços do Windows. <b>Nada sai do seu PC</b>, e cada ajuste é reversível pelo histórico.</div>`;
+  }
+  async function fwStep2(){
+    const r=FW.ram=await fwGetRam();
+    if(!r||!r.modules||!r.modules.length) return `<div class="fw-note">Não consegui ler os pentes de memória agora.</div>`;
+    const mods=r.modules.map(m=>`<div class="fw-stat"><span class="k">${esc(m.slot||'DIMM')}</span><span class="v">${m.capacity_gb}GB · ${esc(m.manufacturer)} · ${m.configured}MHz</span></div>`).join('');
+    const xmp=r.xmp_active
+      ?`<span class="fw-pill ok">XMP/DOCP ativo</span>`
+      :`<span class="fw-pill warn">rodando abaixo do rótulo</span>`;
+    const teach=r.xmp_active
+      ?`Seus pentes rodam a ${r.running_mhz}MHz — a frequência cheia do rótulo (${r.rated_mhz}MHz). Temperado. ${r.dual_channel?'Dual channel ativo.':'Atenção: parece single channel.'}`
+      :`Os pentes são rotulados ${r.rated_mhz}MHz mas rodam a ${r.running_mhz}MHz. Pra liberar o resto: entre na BIOS (Del no boot) → ative <b>XMP</b> (Intel) ou <b>DOCP/EXPO</b> (AMD) → salve e reinicie. Não toco na BIOS por você — é a sua mão no volante.`;
+    return `<div style="margin-bottom:10px">${xmp} <span class="fw-pill">${r.total_gb}GB total</span> <span class="fw-pill">${r.module_count} pente(s)</span></div>${mods}<div class="fw-note">${teach}</div>`;
+  }
+  async function fwStep3(){
+    const d=FW.status||await fwGetStatus();
+    const needed=(d&&Array.isArray(d.tasks))?d.tasks.filter(t=>t.needed):[];
+    if(!needed.length) return `<div class="fw-check"><svg class="fc-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><div><b>Já blindado.</b> Telemetria, indexação e hibernação já estão no ponto seguro. Nada a desligar.</div></div><div class="fw-note">O Sentinel segue vigiando — se o Windows reativar algo num update, você é avisado.</div>`;
+    const cards=needed.map(t=>`<div class="fw-check"><svg class="fc-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--hot)"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>${esc(t.title)}</b><div style="font-size:12.5px;color:var(--ash);margin-top:3px">${esc(t.why)}</div></div></div>`).join('');
+    return `${cards}<div class="fw-note">Você decide. Aplique no fim do assistente ou depois, na <b>Central de Correções</b> — tudo reversível, tudo registrado.</div>`;
+  }
+  async function fwStep4(){
+    return `
+      <div class="fw-soon"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Scanner em construção (próxima fase)</div>
+      <p style="font-size:13.5px;color:var(--ash);line-height:1.6;margin-top:12px">Aqui o Forge vai varrer <b>Steam, Epic e GOG</b>, achar seus jogos instalados e casar com um perfil de otimização que liga sozinho quando o jogo abre.</p>
+      <div style="margin-top:8px"><span class="fw-pill ok">Valorant</span> <span class="fw-pill ok">CS2</span> <span class="fw-pill ok">Cyberpunk 2077</span></div>
+      <div class="fw-note">Três perfis já existem no Forge. O que falta é o detector de instalação — não vou inventar uma lista de jogos que não li do seu disco.</div>`;
+  }
+  async function fwFinale(){
+    const el=document.getElementById('fw-step');
+    el.innerHTML=`<div class="fw-trophy"><div style="color:var(--ash-dim);font-family:var(--f-mono);font-size:12px">cravando baseline…</div></div>`;
+    const res=await fwCaptureBaseline();
+    let line;
+    if(res.status===200) line=`Baseline cravado. O Sentinel agora tem o retrato do seu sistema — qualquer regressão futura ele detecta.`;
+    else if(res.status===403) line=`Pra cravar o baseline preciso de admin. Reabra o Forge como administrador e rode de novo — por ora seu baseline anterior segue valendo.`;
+    else line=`Não consegui cravar o baseline agora (daemon offline?). Dá pra refazer depois pelo assistente.`;
+    return `<div class="fw-trophy">
+      <svg class="tr-medal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="9" r="6"/><path d="M9 14.5 8 22l4-2 4 2-1-7.5"/><path d="M12 6v3l2 1" stroke-width="1.2"/></svg>
+      <div style="font-size:18px;font-weight:600">Primeiro Vergalhão</div>
+      <div style="font-size:13px;color:var(--ash);max-width:42ch;line-height:1.55">${line}</div>
+    </div>`;
+  }
+
+  const FW_STEPS=[
+    {eyebrow:'Passo 1 de 4 · Análise',title:'O retrato do seu PC',desc:'Leitura ao vivo do estado real — score, energia e serviços. Sem achismo.',build:fwStep1},
+    {eyebrow:'Passo 2 de 4 · Memória',title:'RAM & XMP/DOCP',desc:'Seus pentes estão entregando a frequência do rótulo? Vamos conferir.',build:fwStep2},
+    {eyebrow:'Passo 3 de 4 · Privacidade',title:'Telemetria & bloat',desc:'O que roda em segundo plano coletando ou consumindo. Você no controle.',build:fwStep3},
+    {eyebrow:'Passo 4 de 4 · Jogos',title:'Perfis de jogo',desc:'Otimização que liga sozinha quando o jogo abre.',build:fwStep4},
+  ];
+
+  function fwRail(){
+    const rail=document.getElementById('fw-rail');if(!rail)return;
+    let h='';for(let k=0;k<FW.total;k++){const c=k<FW.i?'done':k===FW.i?'now':'';h+=`<span class="fw-dot ${c}"></span>`;}
+    rail.innerHTML=h;
+  }
+  async function fwRender(){
+    const eb=document.getElementById('fw-eyebrow'),ti=document.getElementById('fw-title'),
+          de=document.getElementById('fw-desc'),st=document.getElementById('fw-step'),
+          back=document.getElementById('fw-back'),next=document.getElementById('fw-next'),
+          skip=document.getElementById('fw-skip');
+    fwRail();
+    back.hidden=FW.i===0;
+    if(FW.i<FW.total){
+      const s=FW_STEPS[FW.i];
+      eb.textContent=s.eyebrow;ti.textContent=s.title;de.textContent=s.desc;
+      next.textContent=FW.i===FW.total-1?'Finalizar':'Próximo';
+      skip.hidden=false;
+      st.innerHTML=`<div style="color:var(--ash-dim);font-family:var(--f-mono);font-size:12px">carregando…</div>`;
+      st.innerHTML=await s.build();
+    }else{
+      eb.textContent='Pronto';ti.textContent='Forja acesa';de.textContent='Seu sistema está mapeado e vigiado.';
+      next.textContent='Concluir';back.hidden=true;skip.hidden=true;
+      st.innerHTML=await fwFinale();
+    }
+  }
+  function fwOpen(){
+    const ov=document.getElementById('forge-wizard');if(!ov)return;
+    FW.lastFocus=document.activeElement;
+    FW.i=0;ov.hidden=false;
+    fwRender().then(()=>{document.getElementById('fw-next')?.focus();});
+    document.addEventListener('keydown',fwKey,true);
+  }
+  function fwClose(seen){
+    const ov=document.getElementById('forge-wizard');if(!ov)return;
+    ov.hidden=true;
+    document.removeEventListener('keydown',fwKey,true);
+    if(seen) localStorage.setItem('forge_wizard_seen','1');
+    try{FW.lastFocus&&FW.lastFocus.focus();}catch{}
+    // refresh dashboard (baseline pode ter mudado)
+    fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+  }
+  function fwNext(){ if(FW.i<FW.total){FW.i++;fwRender();} else {fwClose(true);} }
+  function fwBack(){ if(FW.i>0){FW.i--;fwRender();} }
+  // Foco confinado + Esc (acessibilidade, ref. metodologia Gemini)
+  function fwKey(e){
+    if(e.key==='Escape'){e.preventDefault();fwClose(true);return;}
+    if(e.key!=='Tab')return;
+    const card=document.querySelector('#forge-wizard .fw-card');if(!card)return;
+    const f=[...card.querySelectorAll('button,[href],input,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.hidden&&x.offsetParent!==null);
+    if(!f.length)return;
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  }
+  let fwAutoTried=false;
+  function maybeOpenWizard(d){
+    if(fwAutoTried)return;fwAutoTried=true;
+    const fab=document.getElementById('fw-fab');if(fab)fab.hidden=false;
+    const seen=localStorage.getItem('forge_wizard_seen')==='1';
+    if(d&&d.has_baseline===false&&!seen)fwOpen();
+  }
+  window.forgeWizard=fwOpen;
+
+  // Botões do wizard via DELEGAÇÃO no document, em top-level. Não depende de o
+  // DOMContentLoaded já ter rodado: o wizard pode auto-abrir no boot antes do DCL,
+  // e binding direto getElementById+addEventListener falharia silenciosamente
+  // (era a causa de "clico e não acontece nada").
+  document.addEventListener('click',e=>{
+    const t=e.target.closest('#fw-next,#fw-back,#fw-close,#fw-skip,#fw-fab');
+    if(!t)return;
+    e.preventDefault();
+    if(t.id==='fw-next')fwNext();
+    else if(t.id==='fw-back')fwBack();
+    else if(t.id==='fw-fab')fwOpen();
+    else fwClose(true);            // fw-close / fw-skip
+  });
+
+  // wire buttons after DOM ready
+  document.addEventListener('DOMContentLoaded',()=>{
+    // Forward optimization actions (dashboard "Corrigir" with a data-apply id).
+    // Delegação: pega tanto os "Corrigir" estáticos do dash quanto os cards da
+    // Central de Correções renderizados ao vivo (innerHTML não dispara binding direto).
+    document.addEventListener('click',e=>{
+      const b=e.target.closest('.mini-btn[data-apply]');
+      if(b) doApply(b,b.dataset.apply);
+    });
+    // "Forjar tudo" → Sopro da Forja: aplica o conjunto seguro inteiro, atômico.
+    document.querySelector('.fix-all')?.addEventListener('click',function(){forgeQuick(this);});
+    // Restore-to-baseline (Sentinel / System screen) keeps the reactive rail.
+    document.querySelectorAll('.btn-apply').forEach(b=>{
+      b.addEventListener('click',function(){doRestore(this);});
+    });
+    // Modo Jogo: o toggle real do painel de jogos dirige o daemon.
+    document.getElementById('gm-toggle')?.addEventListener('change',function(){paintToggle(this.checked);forgeGameMode(this.checked);});
+  });
+
+  // ---- LED bar helpers ----
+  const LED_COUNT = 24;
+  function makeLeds(el){
+    el.innerHTML='';
+    el.style.cssText='display:flex;gap:2px;align-items:center;height:10px;flex:1';
+    for(let i=0;i<LED_COUNT;i++){const s=document.createElement('span');s.style.cssText='height:100%;flex:1;border-radius:1.5px;background:var(--steel-2);transition:background .25s,box-shadow .25s';el.appendChild(s);}
+  }
+  function setLeds(el,pct,colorFn){
+    const segs=el.children;const lit=Math.round(pct*LED_COUNT/100);
+    for(let i=0;i<segs.length;i++){
+      const on=i<lit;const s=segs[i];
+      if(on){const c=colorFn(i/LED_COUNT);s.style.background=c;s.style.boxShadow='0 0 5px '+c+'88';}
+      else{s.style.background='var(--steel-2)';s.style.boxShadow='none';}
+    }
+  }
+  function gpuColor(r){if(r<.5)return'#3b82f6';if(r<.75)return'#22c55e';if(r<.9)return'#f59e0b';return'#ef4444';}
+  function tempColor(r){if(r<.5)return'#22c55e';if(r<.7)return'#84cc16';if(r<.85)return'#f59e0b';return'#ef4444';}
+  function voltColor(){return'#fcd34d';}
+
+  // init bars
+  ['ab-gpu-bar','ab-mem-bar','ab-temp-bar','ab-volt-bar'].forEach(id=>{
+    const el=document.getElementById(id);if(el)makeLeds(el);
+  });
+
+  // Live GPU telemetry from /api/gpu (nvidia-smi behind the daemon). Real numbers, no
+  // simulation: when the daemon/GPU can't be read, every field shows "—" instead of a
+  // made-up value. Core voltage isn't exposed by nvidia-smi, so VOLT stays "—".
+  const setTxt=(id,val,cls)=>{const e=document.getElementById(id);if(e){e.textContent=val;if(cls)e.className=cls;}};
+  const neonCls=(v,warn,crit)=>v>=crit?'neon-forge':v>=warn?'neon-hot':'neon-ok';
+
+  // Semicírculo do gauge tem comprimento ~163.4. frac 0..1 → arco proporcional.
+  const ARC_LEN=163.4;
+  function setArc(id,frac){const p=document.getElementById(id);if(p)p.setAttribute('stroke-dasharray',(Math.max(0,Math.min(1,frac))*ARC_LEN).toFixed(1)+' '+ARC_LEN);}
+  const GPU_TEMP_LIMIT=85;
+
+  function paintGpu(g){
+    const ok = g && g.available;
+    const dash = '—';
+    const ts=new Date().toLocaleTimeString('pt-BR');
+    const el=document.getElementById('ab-ts');if(el)el.textContent=ts;
+
+    const temp = ok && g.temp_c   !=null ? g.temp_c   : null;
+    const core = ok && g.core_mhz !=null ? g.core_mhz : null;
+    const mem  = ok && g.mem_mhz  !=null ? g.mem_mhz  : null;
+    const util = ok && g.util_pct !=null ? g.util_pct : null;
+    const used = ok && g.mem_used_mb !=null ? g.mem_used_mb : null;
+    const total= ok && g.mem_total_mb!=null ? g.mem_total_mb: null;
+    const fan  = ok && g.fan_pct  !=null ? g.fan_pct  : null;
+
+    // LED bars: real percentages where we have them.
+    const gBar=document.getElementById('ab-gpu-bar');
+    const mBar=document.getElementById('ab-mem-bar');
+    const tBar=document.getElementById('ab-temp-bar');
+    const vBar=document.getElementById('ab-volt-bar');
+    if(gBar)setLeds(gBar, util!=null?util:0, gpuColor);
+    if(mBar)setLeds(mBar, (used!=null&&total)?used/total*100:0, r=>r<.6?'#3b82f6':'#60a5fa');
+    if(tBar)setLeds(tBar, temp!=null?temp:0, tempColor);
+    if(vBar)setLeds(vBar, 0, voltColor);
+
+    // Mini panel (Afterburner-style rail).
+    setTxt('ab-gpu-mhz', core!=null?core:dash, core!=null?neonCls(util??0,70,90):'neon-cold');
+    setTxt('ab-mem-mhz', mem!=null?mem:dash, 'neon-cold');
+    setTxt('ab-temp-c',  temp!=null?temp:dash, temp!=null?neonCls(temp,70,85):'neon-ok');
+    setTxt('ab-volt-mv', dash, 'neon-hot');
+
+    // GPU screen "Ao vivo" panel.
+    setTxt('gpu-live-temp',  temp!=null?temp:dash);
+    setTxt('gpu-live-util',  util!=null?util:dash);
+    setTxt('gpu-live-clock', core!=null?core:dash);
+    setTxt('gpu-live-fan',   fan!=null?fan:dash);
+    setTxt('gpu-live-vram',  used!=null?(used/1024).toFixed(1):dash);
+
+    // ---- Tela Monitor: GPU temp gauge + alerta de sensor, tudo do dado real ----
+    setTxt('mon-gpu-temp', temp!=null?temp:dash, temp!=null?neonCls(temp,70,85):'neon-cold');
+    setTxt('mon-gpu-sub',  ok ? ((util!=null?util:'—')+'% uso · '+(core!=null?core:'—')+' MHz')
+                              : 'GPU não detectada');
+    setArc('arc-gpu', temp!=null ? temp/100 : 0);
+    // Alerta dispara só com leitura real acima do limite. Sem fonte ou abaixo → estado calmo.
+    paintSensorAlert(temp);
+    paintPower(g && g.power);
+  }
+
+  // ---- Power limit (Fase 1): slider real de /api/gpu.power, apply/confirm/reset ----
+  let plDragging=false, plCountTimer=null;
+  function paintPower(p){
+    const slider=document.getElementById('pl-slider');
+    const status=document.getElementById('pl-status');
+    if(!slider) return;
+    if(!p || !p.available){
+      slider.disabled=true;
+      document.getElementById('pl-apply').disabled=true;
+      if(status) status.textContent='Sem GPU NVIDIA — limite de energia indisponível.';
+      return;
+    }
+    document.getElementById('pl-apply').disabled=false;
+    setTxt('pl-min', p.min+' W'); setTxt('pl-max', p.max+' W');
+    setTxt('pl-default', 'padrão '+p.default+' W');
+    slider.min=p.min; slider.max=p.max; slider.disabled=false;
+    // Não brigar com o usuário enquanto arrasta.
+    if(!plDragging){ slider.value=p.current; setTxt('pl-watts', p.current); }
+    if(status && !plCountTimer)
+      status.textContent = p.current===p.default
+        ? 'No padrão do driver ('+p.default+' W).'
+        : 'Limite atual: '+p.current+' W (padrão '+p.default+' W).';
+  }
+  (function(){
+    const slider=document.getElementById('pl-slider');
+    if(!slider) return;
+    slider.addEventListener('input',()=>{ plDragging=true; setTxt('pl-watts', slider.value); });
+    slider.addEventListener('change',()=>{ plDragging=false; });
+    const status=()=>document.getElementById('pl-status');
+    async function post(path,body){
+      const r=await fetch(BASE+path,{method:'POST',headers:{'Security-Token':TOKEN,'Content-Type':'application/json'},
+        body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(9000)});
+      return {status:r.status, data:await r.json().catch(()=>({}))};
+    }
+    function startCountdown(secs){
+      const box=document.getElementById('pl-confirm'); const cnt=document.getElementById('pl-count');
+      if(box) box.style.display='flex';
+      let s=secs; if(cnt) cnt.textContent=s;
+      clearInterval(plCountTimer);
+      plCountTimer=setInterval(()=>{ s--; if(cnt) cnt.textContent=s; if(s<=0){ stopCountdown(); tickMonitor(); } },1000);
+    }
+    function stopCountdown(){ clearInterval(plCountTimer); plCountTimer=null; const box=document.getElementById('pl-confirm'); if(box) box.style.display='none'; }
+    document.getElementById('pl-apply')?.addEventListener('click',async function(){
+      const w=parseInt(slider.value,10); const st=status();
+      this.disabled=true;
+      try{
+        const {status:code,data}=await post('/api/gpu/power',{watts:w});
+        if(code===403){ if(st) st.textContent='Precisa admin — rode o Forge elevado (run-forge) pra ajustar a GPU.'; }
+        else if(data.ok){ if(st) st.textContent=(data.message||('Aplicado '+data.applied+' W')); slider.value=data.applied; setTxt('pl-watts',data.applied); startCountdown(data.revert_seconds||15); }
+        else { if(st) st.textContent=(data.message||'Não foi possível aplicar'); }
+      }catch{ if(st) st.textContent='Daemon offline.'; }
+      this.disabled=false;
+    });
+    document.getElementById('pl-keep')?.addEventListener('click',async function(){
+      stopCountdown(); const st=status();
+      try{ const {data}=await post('/api/gpu/power/confirm'); if(st) st.textContent=data.kept?'Mantido. Limite fixado.':'Nada pendente.'; }
+      catch{} tickMonitor();
+    });
+    document.getElementById('pl-reset')?.addEventListener('click',async function(){
+      stopCountdown(); const st=status();
+      try{ const {status:code,data}=await post('/api/gpu/power/reset');
+        if(code===403){ if(st) st.textContent='Precisa admin pra restaurar.'; }
+        else if(st) st.textContent=data.ok?('Restaurado ao padrão ('+data.applied+' W).'):'Falhou.'; }
+      catch{} tickMonitor();
+    });
+  })();
+
+  // Card de alerta data-driven. Substitui o antigo "87°C" chumbado: só aparece quando
+  // a temperatura REAL da GPU cruza o limite. Sem botão "Forçar ventoinhas" (sem backend).
+  function paintSensorAlert(gpuTemp){
+    const card=document.getElementById('mon-alert');
+    const okState=document.getElementById('mon-alert-ok');
+    const breach = gpuTemp!=null && gpuTemp>=GPU_TEMP_LIMIT;
+    if(card)   card.style.display = breach ? 'flex' : 'none';
+    if(okState)okState.style.display = breach ? 'none' : 'flex';
+    if(breach){
+      setTxt('mon-alert-title', 'GPU acima de '+GPU_TEMP_LIMIT+'°C');
+      const sub=document.getElementById('mon-alert-sub');
+      if(sub) sub.innerHTML='Temperatura detectada: <span style="font-family:var(--f-mono);color:var(--forge)">'+gpuTemp+'°C</span> — acima do limite definido';
+    }
+  }
+
+  function tickMonitor(){
+    fetch(BASE+'/api/gpu',{signal:AbortSignal.timeout(2500)})
+      .then(r=>r.json()).then(paintGpu).catch(()=>paintGpu(null));
+  }
+  tickMonitor();
+  setInterval(tickMonitor,2000);
+
+  // ---- Live system monitor: /api/monitor (CPU/RAM/disks/procs) + /api/ram (speed/XMP) ----
+  const fmtRam = b => b>=1073741824 ? (b/1073741824).toFixed(1)+'GB' : Math.round(b/1048576)+'MB';
+  // bytes/s → string com unidade. <64KB/s = "ocioso" (ruído de fundo do SO).
+  const fmtBps = b => {
+    if(b==null) return '—';
+    if(b < 65536) return '<span style="color:var(--ash-dim)">ocioso</span>';
+    if(b >= 1073741824) return (b/1073741824).toFixed(1)+'<span class="u">GB/s</span>';
+    if(b >= 1048576)    return (b/1048576).toFixed(0)+'<span class="u">MB/s</span>';
+    return Math.round(b/1024)+'<span class="u">KB/s</span>';
+  };
+  const tib = b => { const t=b/1099511627776; return t>=1 ? t.toFixed(t>=10?0:1)+' TB' : Math.round(b/1073741824)+' GB'; };
+  const diskType = d => { const bus=d.bus||'', m=d.media||''; if(/nvme/i.test(bus))return'NVMe'; if(/ssd/i.test(m))return'SSD'; if(/hdd/i.test(m))return'HDD'; return m||bus||'—'; };
+
+  function paintSys(j){
+    const ok = j&&j.available&&j.sys, s = ok?j.sys:null;
+    if(s&&s.cpu) setTxt('hw-cpu-name', 'CPU — '+(s.cpu.name||'').trim()+'  ·  '+(s.cpu.load??'—')+'% uso');
+    if(s&&s.ram){
+      const totB=s.ram.total_kb*1024, usedB=totB-s.ram.free_kb*1024, pct=totB?Math.round(usedB/totB*100):0;
+      setTxt('hw-ram-usage', (usedB/1073741824).toFixed(1)+'/'+(totB/1073741824).toFixed(0)+'GB · '+pct+'%');
+    }
+    // ---- Tela Monitor: CPU carga total (real) + painel RAM ----
+    if(s&&s.cpu){
+      const load=s.cpu.load!=null?s.cpu.load:null;
+      setTxt('mon-cpu-name', (s.cpu.name||'').trim());
+      const lv=document.getElementById('mon-cpu-load');
+      if(lv) lv.innerHTML=(load!=null?load:'—')+'<span style="font-size:13px;color:var(--ash-dim)">%</span>';
+      const bar=document.getElementById('mon-cpu-loadbar');
+      if(bar) bar.style.width=(load!=null?load:0)+'%';
+      setTxt('mon-cpu-cores', (s.cpu.cores!=null?s.cpu.cores:'—')+' núcleos · '+(s.cpu.threads!=null?s.cpu.threads:'—')+' threads');
+      // Per-core (A2): barra por thread, cor pela carga (frio→forja).
+      const pc=document.getElementById('mon-cpu-percore');
+      if(pc && Array.isArray(s.cpu.per_core)){
+        pc.innerHTML=s.cpu.per_core.map(v=>{
+          const h=Math.max(6,Math.min(100,v));
+          const col=v>=80?'var(--hot)':v>=50?'var(--forge)':v>=20?'var(--ember)':'var(--steel-2)';
+          return '<div title="'+v+'%" style="flex:1;height:'+h+'%;min-height:6px;background:'+col+';border-radius:2px;transition:height .4s,background .4s"></div>';
+        }).join('');
+      }
+    }
+    if(s&&s.ram){
+      const totB=s.ram.total_kb*1024, usedB=totB-s.ram.free_kb*1024, pct=totB?Math.round(usedB/totB*100):0;
+      const ru=document.getElementById('mon-ram-used');
+      if(ru) ru.innerHTML=(usedB/1073741824).toFixed(1)+'<span class="u">/'+(totB/1073741824).toFixed(0)+' GB</span>';
+      const rp=document.getElementById('mon-ram-pct');
+      if(rp) rp.innerHTML=pct+'<span class="u">%</span>';
+    }
+    // SSD throughput (A2): bytes/s → unidade legível. 0 vira "ocioso", não "—".
+    if(s&&s.io){
+      const rd=document.getElementById('mon-ssd-r'), wr=document.getElementById('mon-ssd-w');
+      if(rd){ rd.style.color=''; rd.innerHTML=fmtBps(s.io.read_bps); }
+      if(wr){ wr.style.color=''; wr.innerHTML=fmtBps(s.io.write_bps); }
+    }
+    const tb=document.getElementById('hw-disk-body');
+    if(tb){
+      if(!ok||!s.disks||!s.disks.length) tb.innerHTML='<tr><td colspan="6" style="padding:13px 0;color:var(--ash-dim)">Sem dados de disco</td></tr>';
+      else tb.innerHTML=s.disks.map(d=>{
+        const ty=diskType(d), tyc=/nvme/i.test(ty)?'var(--hot)':(/hdd/i.test(ty)?'var(--ash-dim)':'var(--chrome)');
+        const usage=(d.used!=null&&d.size)?tib(d.used)+' / '+tib(d.size):tib(d.size);
+        const healthy=/healthy/i.test(d.health||''), hl=healthy?'100% — Ótimo':(d.health||'—'), hc=healthy?'#6ee7a8':'#f59e0b';
+        const tp=d.temp!=null?d.temp+'°C':'—';
+        return '<tr style="border-top:1px solid var(--edge-soft)"><td style="padding:13px 14px 13px 0;font-weight:500">'+(d.model||'—')+'</td><td style="padding:13px 14px 13px 0;font-family:var(--f-mono);font-size:12px;color:'+tyc+'">'+ty+'</td><td style="padding:13px 14px 13px 0;color:var(--ash)">'+tib(d.size)+'</td><td style="padding:13px 14px 13px 0;color:var(--ash)">'+usage+'</td><td style="padding:13px 14px 13px 0"><span style="color:'+hc+';font-family:var(--f-mono);font-size:12px">'+hl+'</span></td><td style="padding:13px 0;font-family:var(--f-mono)">'+tp+'</td></tr>';
+      }).join('');
+    }
+    const pl=document.getElementById('mon-proc-list');
+    if(pl){
+      if(!ok||!s.procs||!s.procs.length) pl.innerHTML='<div class="proc-row"><span class="proc-name" style="color:var(--ash-dim)">Sem dados</span><span class="proc-val">—</span><span class="proc-val">—</span><span class="proc-val">—</span></div>';
+      else pl.innerHTML=s.procs.map(p=>{
+        const cpu=p.cpu!=null?p.cpu+'%':'—', hi=p.cpu>=20?' hi':'';
+        return '<div class="proc-row"><span class="proc-name">'+p.name+'</span><span class="proc-val'+hi+'">'+cpu+'</span><span class="proc-val">'+fmtRam(p.ram)+'</span><span class="proc-val" title="GPU por processo: requer captura em jogo">—</span></div>';
+      }).join('');
+    }
+  }
+  function tickSys(){ fetch(BASE+'/api/monitor',{signal:AbortSignal.timeout(7000)}).then(r=>r.json()).then(paintSys).catch(()=>paintSys(null)); }
+  tickSys(); setInterval(tickSys,3000);
+
+  // ---- Jogos: detecção real de /api/games (Steam/Epic + HDD/SSD) ----
+  function renderGames(j){
+    const grid=document.getElementById('games-grid');
+    const empty=document.getElementById('games-empty');
+    const count=document.getElementById('games-count');
+    if(!grid) return;
+    const list=(j&&j.available&&Array.isArray(j.games))?j.games:null;
+    if(list===null){ grid.innerHTML='<div style="grid-column:1/-1;color:var(--ash-dim);font-size:13px;padding:10px 0">Não consegui ler os jogos (daemon offline?).</div>'; return; }
+    if(count) count.textContent=list.length?('· '+list.length):'';
+    if(list.length===0){ grid.innerHTML=''; if(empty) empty.style.display='block'; return; }
+    if(empty) empty.style.display='none';
+    grid.innerHTML=list.map(g=>{
+      const hdd=/hdd/i.test(g.media||'');
+      const badge=hdd
+        ? '<span style="font-family:var(--f-mono);font-size:10px;color:var(--danger);padding:3px 8px;border-radius:20px;border:1px solid rgba(212,84,58,.3);background:rgba(212,84,58,.08)">NO HDD</span>'
+        : '<span style="font-family:var(--f-mono);font-size:10px;color:#6ee7a8;padding:3px 8px;border-radius:20px;border:1px solid rgba(110,231,168,.25);background:rgba(110,231,168,.07)">'+esc(g.media||'SSD')+'</span>';
+      const border=hdd?'1px solid rgba(212,84,58,.25)':'1px solid var(--edge-soft)';
+      const bg=hdd?'rgba(212,84,58,.04)':'var(--steel)';
+      const hint=hdd?'<div style="font-size:12.5px;color:var(--ash);margin-top:8px">Mover pro SSD reduz o tempo de carregamento.</div>':'';
+      return '<div style="padding:16px;border:'+border+';border-radius:10px;background:'+bg+'">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">'
+        +'<span style="font-size:14px;font-weight:500">'+esc(g.name)+'</span>'+badge+'</div>'
+        +'<div style="font-size:12px;color:var(--ash);word-break:break-all">'+esc(g.launcher)+' · '+esc(g.path)+'</div>'
+        +hint+'</div>';
+    }).join('');
+  }
+  function tickGames(){ fetch(BASE+'/api/games',{signal:AbortSignal.timeout(12000)}).then(r=>r.json()).then(renderGames).catch(()=>renderGames(null)); }
+  tickGames(); setInterval(tickGames,30000);
+
+  function paintRam(r){
+    if(!r) return;
+    if(r.running_mhz) setTxt('hw-ram-mhz', r.running_mhz);
+    setTxt('hw-ram-mode', r.xmp_active?'MHz · XMP ativo':'MHz');
+    if(r.total_gb) setTxt('hw-ram-total', r.total_gb+' GB'+(r.dual_channel?' · Dual':''));
+    setTxt('hw-ram-xmp', r.xmp_active?('XMP '+(r.rated_mhz||'')):'sem XMP');
+  }
+  fetch(BASE+'/api/ram',{signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(paintRam).catch(()=>{});
+
+  // Heat the palette to match the score shown statically, before the daemon answers.
+  const initScore=parseInt(document.querySelector('.gauge-num')?.textContent,10);
+  setForgeTemp(isNaN(initScore)?75:initScore);
+  paintScoreBars();   // pinta cada barra/nota do dash pela sua própria nota
+  paintArc(isNaN(initScore)?75:initScore);  // arco do gauge na temperatura da nota
+
+  function poll(){
+    fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{})
+      .finally(()=>setTimeout(poll,5000));
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Forge">
+  <defs>
+    <linearGradient id="heat" x1="6" y1="34" x2="30" y2="6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b4a6b"/>
+      <stop offset="0.45" stop-color="#b8442e"/>
+      <stop offset="0.8" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#fcd34d"/>
+    </linearGradient>
+  </defs>
+  <!-- Forged spark mark: angular ascending facets struck from an anvil -->
+  <g>
+    <path d="M18 4 L30 22 L18 18 Z" fill="url(#heat)"/>
+    <path d="M18 4 L6 22 L18 18 Z" fill="url(#heat)" opacity="0.55"/>
+    <path d="M6 22 L30 22 L18 36 Z" fill="url(#heat)" opacity="0.85"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="44" y="27" font-family="'Space Grotesk', sans-serif" font-size="20" font-weight="600" letter-spacing="3.5" fill="#f4f4f5">FORGE</text>
+</svg>

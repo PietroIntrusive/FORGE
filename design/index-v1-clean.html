@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forge — Design Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --void:#0a0a0b; --anvil:#141416; --steel:#1c1c20; --steel-2:#232328;
+    --edge:#2a2a30; --edge-soft:rgba(255,255,255,.06);
+    --ash:#8b8b94; --ash-dim:#5f5f67; --chrome:#f4f4f5;
+    --cold:#3b4a6b; --ember:#b8442e; --forge:#f97316; --hot:#fcd34d;
+    --danger:#d4543a;
+    --f-display:'Space Grotesk',sans-serif;
+    --f-ui:'Inter',sans-serif;
+    --f-mono:'JetBrains Mono',monospace;
+    --r-card:14px; --r-ctl:8px;
+    --bar-h:56px; --side-w:228px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--void); color:var(--chrome); font-family:var(--f-ui);
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    min-height:100vh; overflow-x:hidden;
+  }
+  /* ambient forge glow, top-center, behind everything */
+  body::before{
+    content:""; position:fixed; top:-40%; left:50%; transform:translateX(-50%);
+    width:900px; height:700px; pointer-events:none; z-index:0;
+    background:radial-gradient(closest-side, rgba(249,115,22,.10), rgba(249,115,22,0) 70%);
+  }
+
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  ::selection{background:rgba(249,115,22,.3)}
+
+  /* ---------- GLASS TOP BAR ---------- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; height:var(--bar-h); z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(16,16,18,.55);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    border-bottom:1px solid var(--edge-soft);
+  }
+  .logo{display:flex;align-items:center;gap:11px;user-select:none}
+  .logo .mark{width:24px;height:30px;display:block}
+  .logo .word{
+    font-family:var(--f-display); font-weight:600; font-size:18px;
+    letter-spacing:.32em; padding-left:.32em;
+    background:linear-gradient(180deg,#fff,#cfcfd4); -webkit-background-clip:text;
+    background-clip:text; color:transparent;
+  }
+  .topbar .bar-side{position:absolute;display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11px;color:var(--ash)}
+  .topbar .bar-left{left:18px}
+  .topbar .bar-right{right:18px}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--forge);box-shadow:0 0 8px var(--forge);animation:breathe 3s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.55}50%{opacity:1}}
+
+  /* ---------- SHELL ---------- */
+  .shell{position:relative;z-index:1;display:grid;grid-template-columns:var(--side-w) 1fr;min-height:100vh;padding-top:var(--bar-h)}
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    position:sticky; top:var(--bar-h); align-self:start; height:calc(100vh - var(--bar-h));
+    border-right:1px solid var(--edge-soft); padding:18px 14px;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .nav-eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ash-dim);padding:14px 12px 7px}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--r-ctl);
+    color:var(--ash); font-weight:450; font-size:13.5px; transition:.15s; position:relative;
+  }
+  .nav-item svg{width:17px;height:17px;flex:none;stroke:currentColor;stroke-width:1.7;fill:none}
+  .nav-item:hover{background:var(--steel);color:var(--chrome)}
+  .nav-item.active{background:var(--steel-2);color:var(--chrome)}
+  .nav-item.active::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--forge),var(--hot));box-shadow:0 0 10px var(--forge)}
+  .nav-item .badge{margin-left:auto;font-family:var(--f-mono);font-size:10px;background:rgba(212,84,58,.16);color:#f0a08c;padding:1px 6px;border-radius:20px}
+  .trust{margin-top:auto;padding:13px 12px;border:1px solid var(--edge-soft);border-radius:var(--r-ctl);background:linear-gradient(180deg,var(--steel),rgba(28,28,32,.4))}
+  .trust .row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ash)}
+  .trust .row+.row{margin-top:7px}
+  .trust svg{width:14px;height:14px;stroke:#6ee7a8;stroke-width:1.8;fill:none;flex:none}
+
+  /* ---------- MAIN ---------- */
+  .main{padding:30px 36px 60px;max-width:1180px}
+  .screen{display:none;animation:rise .4s cubic-bezier(.2,.7,.2,1)}
+  .screen.active{display:block}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page-eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--forge);margin-bottom:7px}
+  .page-title{font-family:var(--f-display);font-size:27px;font-weight:600;letter-spacing:-.01em}
+  .page-sub{color:var(--ash);margin-top:5px;font-size:13.5px;max-width:60ch}
+  .head{margin-bottom:26px}
+
+  .panel{background:linear-gradient(180deg,var(--steel),var(--anvil));border:1px solid var(--edge-soft);border-radius:var(--r-card);padding:22px}
+  .panel-eyebrow{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+
+  /* ---------- DASHBOARD HERO ---------- */
+  .hero{display:grid;grid-template-columns:300px 1fr;gap:18px;margin-bottom:18px}
+  .score-card{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .score-card .glow{position:absolute;inset:0;background:radial-gradient(closest-side,rgba(249,115,22,.18),transparent 68%);pointer-events:none}
+  .gauge-wrap{position:relative;width:240px;height:240px}
+  .gauge-wrap svg{transform:rotate(0);overflow:visible}
+  .gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge-num{font-family:var(--f-display);font-size:66px;font-weight:600;line-height:1;letter-spacing:-.02em;background:linear-gradient(180deg,#fff,#fcd34d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .gauge-max{font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:2px}
+  .gauge-tier{margin-top:14px;font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--hot);padding:5px 13px;border:1px solid rgba(252,211,77,.25);border-radius:30px;background:rgba(252,211,77,.06)}
+  .delta{margin-top:14px;font-size:13px;color:var(--ash)}
+  .delta b{color:#6ee7a8;font-family:var(--f-mono);font-weight:600}
+
+  /* category bars */
+  .cats{display:flex;flex-direction:column;justify-content:center;gap:15px}
+  .cat{display:grid;grid-template-columns:96px 1fr 64px;align-items:center;gap:14px}
+  .cat .name{font-size:13px;color:var(--ash)}
+  .cat .track{height:7px;border-radius:6px;background:var(--steel-2);overflow:hidden;position:relative}
+  .cat .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--ember),var(--forge),var(--hot));box-shadow:0 0 10px rgba(249,115,22,.4)}
+  .cat .val{font-family:var(--f-mono);font-size:13px;text-align:right}
+  .cat .val .d{color:#6ee7a8;font-size:11px}
+
+  /* grid row */
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:18px}
+
+  /* timeline chart */
+  .chart{width:100%;height:140px;display:block}
+  .chart-x{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:8px}
+
+  /* issues */
+  .issue{display:flex;align-items:center;gap:13px;padding:13px 0;border-top:1px solid var(--edge-soft)}
+  .issue:first-of-type{border-top:none;padding-top:2px}
+  .issue .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .issue .dot.warn{background:var(--forge);box-shadow:0 0 8px var(--forge)}
+  .issue .dot.crit{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  .issue .dot.info{background:var(--ash-dim)}
+  .issue .txt{flex:1}
+  .issue .txt .t{font-size:13.5px}
+  .issue .txt .s{font-size:12px;color:var(--ash-dim);margin-top:1px}
+  .mini-btn{font-size:12px;font-weight:500;padding:6px 13px;border-radius:7px;background:var(--steel-2);border:1px solid var(--edge);color:var(--chrome);transition:.15s;white-space:nowrap}
+  .mini-btn:hover{border-color:var(--forge);color:var(--hot)}
+
+  .fix-all{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:500;font-size:14px;padding:11px 22px;border-radius:10px;color:#1a0e00;background:linear-gradient(180deg,var(--hot),var(--forge));box-shadow:0 6px 20px -6px rgba(249,115,22,.6);transition:.15s}
+  .fix-all:hover{transform:translateY(-1px);box-shadow:0 10px 26px -6px rgba(249,115,22,.7)}
+  .fix-all svg{width:17px;height:17px;stroke:#1a0e00;stroke-width:2.2;fill:none}
+
+  /* achievements strip */
+  .ach-strip{display:flex;gap:12px;overflow:hidden}
+  .ach{flex:1;min-width:0;padding:14px;border:1px solid var(--edge-soft);border-radius:var(--r-ctl);background:var(--steel);display:flex;flex-direction:column;gap:8px}
+  .ach.locked{opacity:.4}
+  .ach .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25)}
+  .ach .ic svg{width:16px;height:16px;stroke:var(--hot);stroke-width:1.7;fill:none}
+  .ach.locked .ic{background:var(--steel-2);border-color:var(--edge)}
+  .ach.locked .ic svg{stroke:var(--ash-dim)}
+  .ach .nm{font-size:12.5px;font-weight:500}
+  .ach .ds{font-size:11px;color:var(--ash-dim);line-height:1.4}
+
+  /* ---------- GPU SCREEN ---------- */
+  .gpu-grid{display:grid;grid-template-columns:1fr 320px;gap:18px}
+  .tuner-row{margin-bottom:24px}
+  .tuner-row:last-child{margin-bottom:0}
+  .tuner-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px}
+  .tuner-head .lbl{font-size:13.5px}
+  .tuner-head .num{font-family:var(--f-mono);font-size:14px;color:var(--hot)}
+  .tuner-head .num .u{color:var(--ash-dim);font-size:11px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;background:var(--steel-2);outline:none}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--ember),var(--forge) 70%,var(--steel-2) 70%)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:var(--chrome);border:3px solid var(--forge);box-shadow:0 0 10px rgba(249,115,22,.5);cursor:grab}
+  input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid var(--hot);outline-offset:2px}
+  .tuner-scale{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:7px}
+  .tuner-actions{display:flex;gap:10px;margin-top:6px}
+  .btn-ghost{font-size:13px;font-weight:500;padding:9px 16px;border-radius:8px;border:1px solid var(--edge);color:var(--ash);transition:.15s}
+  .btn-ghost:hover{color:var(--chrome);border-color:var(--ash-dim)}
+  .btn-apply{font-size:13px;font-weight:500;padding:9px 18px;border-radius:8px;color:#1a0e00;background:linear-gradient(180deg,var(--hot),var(--forge));transition:.15s}
+  .btn-apply:hover{transform:translateY(-1px)}
+
+  .live{display:flex;flex-direction:column;gap:0}
+  .metric{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--edge-soft)}
+  .metric:first-of-type{border-top:none;padding-top:2px}
+  .metric .ml{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ash)}
+  .metric .ml svg{width:16px;height:16px;stroke:var(--ash-dim);stroke-width:1.7;fill:none}
+  .metric .mv{font-family:var(--f-mono);font-size:17px;font-weight:500}
+  .metric .mv .u{font-size:11px;color:var(--ash-dim);margin-left:2px}
+  .temp-ok{color:var(--hot)}
+  .osd-card{margin-top:18px}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+  .toggle-row+.toggle-row{border-top:1px solid var(--edge-soft)}
+  .toggle-row .tl{font-size:13px}
+  .toggle-row .ts{font-size:11.5px;color:var(--ash-dim);margin-top:2px}
+  .switch{width:40px;height:23px;border-radius:20px;background:var(--steel-2);border:1px solid var(--edge);position:relative;transition:.18s;flex:none}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--ash);transition:.18s}
+  .switch.on{background:linear-gradient(90deg,var(--forge),var(--hot));border-color:transparent}
+  .switch.on::after{left:19px;background:#1a0e00}
+
+  /* ---------- SISTEMA / SECURITY SCREEN ---------- */
+  .trust-banner{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:var(--r-card);border:1px solid rgba(110,231,168,.18);background:linear-gradient(180deg,rgba(110,231,168,.06),transparent);margin-bottom:20px}
+  .trust-banner .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(110,231,168,.1);border:1px solid rgba(110,231,168,.22);flex:none}
+  .trust-banner .ic svg{width:20px;height:20px;stroke:#6ee7a8;stroke-width:1.8;fill:none}
+  .trust-banner .t{font-size:14px;font-weight:500}
+  .trust-banner .s{font-size:12.5px;color:var(--ash);margin-top:2px}
+
+  .fix-card{border:1px solid var(--edge-soft);border-radius:var(--r-card);padding:18px 20px;margin-bottom:14px;background:linear-gradient(180deg,var(--steel),var(--anvil));transition:.15s}
+  .fix-card:hover{border-color:var(--edge)}
+  .fc-top{display:flex;align-items:flex-start;gap:13px}
+  .fc-sev{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none}
+  .fc-sev.warn{background:var(--forge);box-shadow:0 0 8px var(--forge)}
+  .fc-sev.crit{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+  .fc-main{flex:1}
+  .fc-title{font-size:15px;font-weight:500}
+  .fc-why{font-size:13px;color:var(--ash);margin-top:5px;line-height:1.55}
+  .fc-diff{display:flex;align-items:center;gap:12px;margin-top:13px;font-family:var(--f-mono);font-size:12.5px;flex-wrap:wrap}
+  .fc-diff .from{color:var(--danger);text-decoration:line-through;text-decoration-color:rgba(212,84,58,.5)}
+  .fc-diff .arrow{color:var(--ash-dim)}
+  .fc-diff .to{color:#6ee7a8}
+  .fc-diff .chip{padding:3px 9px;border-radius:6px;background:var(--steel-2);border:1px solid var(--edge)}
+  .fc-actions{display:flex;gap:9px;margin-left:auto;align-items:flex-start}
+  .reversible{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ash-dim);margin-top:13px}
+  .reversible svg{width:13px;height:13px;stroke:var(--ash-dim);stroke-width:1.7;fill:none}
+
+  .foot-note{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ash-dim);font-family:var(--f-mono)}
+
+  /* ---------- GPU PROFILES ---------- */
+  .profile-bar{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+  .profile-chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip-btn{font-family:var(--f-mono);font-size:11.5px;padding:6px 15px;border-radius:6px;border:1px solid var(--edge);color:var(--ash);background:var(--steel);transition:.15s;letter-spacing:.04em}
+  .chip-btn:hover{border-color:var(--ash-dim);color:var(--chrome)}
+  .chip-btn.on{border-color:var(--forge);color:var(--hot);background:rgba(249,115,22,.1)}
+  .autotune-btn{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;padding:9px 18px;border-radius:9px;border:1px solid rgba(252,211,77,.28);color:var(--hot);background:rgba(252,211,77,.07);transition:.15s;white-space:nowrap}
+  .autotune-btn:hover{background:rgba(252,211,77,.14);border-color:var(--hot)}
+  .autotune-btn svg{width:16px;height:16px;stroke:var(--hot);stroke-width:1.8;fill:none}
+
+  /* ---------- VF CURVE ---------- */
+  .vf-grid{display:grid;grid-template-columns:1fr 300px;gap:18px;margin-bottom:18px}
+  .vf-panel{position:relative}
+  .vf-svg{width:100%;display:block;touch-action:none}
+  .vf-node{cursor:grab;outline:none;transition:r .12s}
+  .vf-node:focus-visible{outline:2px solid var(--hot);outline-offset:3px}
+  .vf-actions{display:flex;gap:9px;margin-top:12px;align-items:center}
+  .vf-hint{font-family:var(--f-mono);font-size:10.5px;color:var(--ash-dim);margin-left:auto}
+  .vf-zone-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase}
+
+  /* ---------- PROCESS LIST ---------- */
+  .proc-list{display:flex;flex-direction:column;gap:0}
+  .proc-row{display:grid;grid-template-columns:1fr 52px 52px 52px;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--edge-soft);font-size:12.5px}
+  .proc-row:first-of-type{border-top:none;padding-top:2px}
+  .proc-name{color:var(--chrome);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proc-val{font-family:var(--f-mono);font-size:12px;text-align:right;color:var(--ash)}
+  .proc-val.hi{color:var(--forge)}
+  .proc-head{display:grid;grid-template-columns:1fr 52px 52px 52px;gap:10px;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash-dim);padding-bottom:10px}
+
+  /* ---------- TOAST NOTIFICATION ---------- */
+  .toast-demo{position:relative;display:flex;gap:12px;padding:14px 16px;border-radius:10px;border:1px solid rgba(212,84,58,.35);background:linear-gradient(180deg,rgba(212,84,58,.12),rgba(212,84,58,.04));margin-bottom:18px}
+  .toast-demo .td-ic{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:rgba(212,84,58,.15);border:1px solid rgba(212,84,58,.3);flex:none}
+  .toast-demo .td-ic svg{width:18px;height:18px;stroke:#f0a08c;stroke-width:1.8;fill:none}
+  .toast-demo .td-title{font-size:13.5px;font-weight:500;margin-bottom:3px}
+  .toast-demo .td-sub{font-size:12px;color:var(--ash)}
+  .toast-demo .td-actions{display:flex;gap:8px;margin-top:10px}
+  .toast-demo .td-fix{font-size:12.5px;font-weight:500;padding:6px 14px;border-radius:7px;background:linear-gradient(180deg,var(--hot),var(--forge));color:#1a0e00}
+  .toast-demo .td-dismiss{font-size:12.5px;padding:6px 14px;border-radius:7px;border:1px solid var(--edge);color:var(--ash)}
+  .toast-label{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:10px}
+
+  @media(max-width:1080px){
+    .hero,.grid-2,.gpu-grid,.vf-grid{grid-template-columns:1fr}
+    .ach-strip{flex-wrap:wrap}
+    .ach{min-width:140px}
+    .autotune-btn{margin-left:0}
+  }
+  @media(max-width:760px){
+    .shell{grid-template-columns:1fr}
+    .sidebar{display:none}
+    .main{padding:22px 18px 50px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== GLASS TOP BAR ===== -->
+<header class="topbar">
+  <div class="bar-side bar-left"><span class="pulse"></span> Sentinela ativo</div>
+  <div class="logo">
+    <svg class="mark" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="m" x1="2" y1="28" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#3b4a6b"/><stop offset=".45" stop-color="#b8442e"/>
+          <stop offset=".8" stop-color="#f97316"/><stop offset="1" stop-color="#fcd34d"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2 L22 17 L12 13 Z" fill="url(#m)"/>
+      <path d="M12 2 L2 17 L12 13 Z" fill="url(#m)" opacity=".55"/>
+      <path d="M2 17 L22 17 L12 28 Z" fill="url(#m)" opacity=".85"/>
+    </svg>
+    <span class="word">FORGE</span>
+  </div>
+  <div class="bar-side bar-right">v1.0.0 · open source</div>
+</header>
+
+<div class="shell">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="nav-eyebrow">Visão geral</div>
+    <a class="nav-item active" data-screen="dash" href="#">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      Painel
+    </a>
+    <div class="nav-eyebrow">Otimização</div>
+    <a class="nav-item" data-screen="sys" href="#">
+      <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
+      Sistema <span class="badge">3</span>
+    </a>
+    <a class="nav-item" data-screen="hw" href="#">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      Hardware
+    </a>
+    <a class="nav-item" data-screen="gpu" href="#">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 21h10M9 17v4M15 17v4"/><circle cx="9" cy="11" r="2"/></svg>
+      GPU
+    </a>
+    <a class="nav-item" data-screen="games" href="#">
+      <svg viewBox="0 0 24 24"><path d="M6 11h4M8 9v4"/><circle cx="16" cy="10" r="1"/><circle cx="18" cy="13" r="1"/><rect x="2" y="6" width="20" height="12" rx="3"/></svg>
+      Jogos
+    </a>
+    <a class="nav-item" data-screen="mon" href="#">
+      <svg viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+      Monitor
+    </a>
+    <div class="nav-eyebrow">Histórico</div>
+    <a class="nav-item" data-screen="hist" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      Linha do tempo
+    </a>
+
+    <div class="trust">
+      <div class="row"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg> Código aberto · auditável</div>
+      <div class="row"><svg viewBox="0 0 24 24"><path d="M5 12h14M5 12a7 7 0 0 1 14 0M5 12a7 7 0 0 0 14 0"/><line x1="2" y1="2" x2="22" y2="22"/></svg> Zero telemetria</div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- ========== DASHBOARD ========== -->
+    <section class="screen active" id="dash">
+      <div class="head">
+        <div class="page-eyebrow">Temperatura de forja</div>
+        <h1 class="page-title">Seu PC está forjado</h1>
+        <p class="page-sub">Quanto mais quente o medidor, mais perto da forma ideal. O Sistema tem 3 ajustes pendentes — corrija para chegar aos 100.</p>
+      </div>
+
+      <div class="hero">
+        <div class="panel score-card">
+          <div class="glow"></div>
+          <div class="gauge-wrap">
+            <svg width="240" height="240" viewBox="0 0 280 280" aria-label="Score 91 de 100">
+              <defs>
+                <linearGradient id="heatArc" x1="40" y1="240" x2="240" y2="40" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stop-color="#3b4a6b"/><stop offset=".4" stop-color="#b8442e"/>
+                  <stop offset=".72" stop-color="#f97316"/><stop offset="1" stop-color="#fcd34d"/>
+                </linearGradient>
+                <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <circle cx="140" cy="140" r="120" fill="none" stroke="#1c1c20" stroke-width="16" stroke-linecap="round"
+                stroke-dasharray="565.5 753.98" transform="rotate(135 140 140)"/>
+              <circle id="arc" cx="140" cy="140" r="120" fill="none" stroke="url(#heatArc)" stroke-width="16" stroke-linecap="round"
+                stroke-dasharray="514.6 753.98" transform="rotate(135 140 140)" filter="url(#bloom)"/>
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-num">91</div>
+              <div class="gauge-max">/ 100</div>
+            </div>
+          </div>
+          <div class="gauge-tier">Forjado</div>
+          <div class="delta">+57 desde o primeiro forjamento · <b>14 dias</b></div>
+        </div>
+
+        <div class="panel cats">
+          <div class="panel-eyebrow" style="grid-column:1/-1">Por categoria</div>
+          <div class="cat"><span class="name">Sistema</span><div class="track"><div class="fill" style="width:82%"></div></div><span class="val">82<span class="d"> +30</span></span></div>
+          <div class="cat"><span class="name">Hardware</span><div class="track"><div class="fill" style="width:95%"></div></div><span class="val">95<span class="d"> +9</span></span></div>
+          <div class="cat"><span class="name">GPU</span><div class="track"><div class="fill" style="width:98%"></div></div><span class="val">98<span class="d"> +18</span></span></div>
+          <div class="cat"><span class="name">Jogos</span><div class="track"><div class="fill" style="width:88%"></div></div><span class="val">88<span class="d"> +12</span></span></div>
+          <div class="cat"><span class="name">Monitor</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="val">100</span></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-eyebrow">Linha do tempo · 14 dias</div>
+          <svg class="chart" viewBox="0 0 600 140" preserveAspectRatio="none" aria-label="Evolução do score">
+            <defs>
+              <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f97316" stop-opacity=".35"/><stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#b8442e"/><stop offset="1" stop-color="#fcd34d"/>
+              </linearGradient>
+            </defs>
+            <!-- regression dip visible around day 9 (Windows Update) -->
+            <path d="M0,118 L50,110 L100,96 L150,88 L200,70 L250,58 L300,46 L350,74 L400,60 L450,40 L500,30 L550,22 L600,18 L600,140 L0,140 Z" fill="url(#fillGrad)"/>
+            <path d="M0,118 L50,110 L100,96 L150,88 L200,70 L250,58 L300,46 L350,74 L400,60 L450,40 L500,30 L550,22 L600,18" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="350" cy="74" r="4" fill="#d4543a" stroke="#141416" stroke-width="2"/>
+            <circle cx="600" cy="18" r="4.5" fill="#fcd34d" stroke="#141416" stroke-width="2"/>
+          </svg>
+          <div class="chart-x"><span>Dia 0</span><span>Dia 9 · WU reverteu</span><span>Hoje</span></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-eyebrow">Ajustes pendentes <span style="color:var(--forge)">3</span></div>
+          <div class="issue">
+            <span class="dot warn"></span>
+            <div class="txt"><div class="t">Plano de energia em Economia</div><div class="s">Limita clocks da CPU em jogos</div></div>
+            <button class="mini-btn">Corrigir</button>
+          </div>
+          <div class="issue">
+            <span class="dot crit"></span>
+            <div class="txt"><div class="t">Telemetria DiagTrack ativa</div><div class="s">Coleta de dados da Microsoft em segundo plano</div></div>
+            <button class="mini-btn">Corrigir</button>
+          </div>
+          <div class="issue">
+            <span class="dot info"></span>
+            <div class="txt"><div class="t">2 jogos instalados no HDD</div><div class="s">Tempos de carregamento mais longos</div></div>
+            <button class="mini-btn">Ver</button>
+          </div>
+          <div style="margin-top:18px;display:flex;justify-content:flex-end">
+            <button class="fix-all"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg> Forjar tudo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-eyebrow">Conquistas <span>4 / 7</span></div>
+        <div class="ach-strip">
+          <div class="ach"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div><div class="nm">Primeiro forjamento</div><div class="ds">Primeira otimização completa</div></div>
+          <div class="ach"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/><path d="M9 21h6"/></svg></div><div class="nm">Mestre térmico</div><div class="ds">GPU abaixo de 75°C em carga</div></div>
+          <div class="ach"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></div><div class="nm">Guarda Sentinela</div><div class="ds">30 dias sem regressão</div></div>
+          <div class="ach"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 21h10"/></svg></div><div class="nm">Tuner de GPU</div><div class="ds">Perfil customizado aplicado</div></div>
+          <div class="ach locked"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></div><div class="nm">Score perfeito</div><div class="ds">Alcance 100 / 100</div></div>
+        </div>
+      </div>
+
+      <div class="foot-note">Forge nunca envia dados sem você ver. Todo ajuste é registrado e reversível.</div>
+    </section>
+
+    <!-- ========== GPU ========== -->
+    <section class="screen" id="gpu">
+      <div class="head">
+        <div class="page-eyebrow">NVIDIA GeForce RTX 3060 Ti · Driver 572.83</div>
+        <h1 class="page-title">Ajuste de GPU</h1>
+        <p class="page-sub">Curva tensão × frequência e offsets via NVAPI. Arraste os pontos para moldar o comportamento da GPU — mais limpo que o Afterburner.</p>
+      </div>
+
+      <!-- Profile bar -->
+      <div class="profile-bar">
+        <div class="profile-chips">
+          <button class="chip-btn on" data-profile="gaming">Gaming</button>
+          <button class="chip-btn" data-profile="silent">Silencioso</button>
+          <button class="chip-btn" data-profile="turbo">Turbo</button>
+          <button class="chip-btn" data-profile="custom1">Custom 1</button>
+          <button class="chip-btn" data-profile="custom2">Custom 2</button>
+        </div>
+        <button class="autotune-btn" id="autotuneBtn">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Otimizar automaticamente
+        </button>
+      </div>
+
+      <!-- V/F Curve + Right Panel -->
+      <div class="vf-grid">
+        <div class="panel vf-panel">
+          <div class="panel-eyebrow">
+            Curva tensão × frequência
+            <span style="font-size:10px;color:var(--ash-dim);letter-spacing:0;text-transform:none;font-family:var(--f-ui)">Arraste os pontos · X = tensão (mV) · Y = frequência (MHz)</span>
+          </div>
+
+          <svg id="vfSvg" class="vf-svg" viewBox="0 0 580 260" role="img" aria-label="Editor de curva tensão frequência">
+            <defs>
+              <linearGradient id="cg" x1="56" y1="0" x2="560" y2="0" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#3b4a6b"/>
+                <stop offset=".38" stop-color="#b8442e"/>
+                <stop offset=".68" stop-color="#f97316"/>
+                <stop offset="1" stop-color="#fcd34d"/>
+              </linearGradient>
+              <linearGradient id="cf" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f97316" stop-opacity=".22"/>
+                <stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="ng"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="lg"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+
+            <!-- Zone fills -->
+            <rect x="56" y="20" width="252" height="204" fill="rgba(110,231,168,.03)" rx="2"/>
+            <rect x="308" y="20" width="84" height="204" fill="rgba(249,115,22,.04)" rx="2"/>
+            <rect x="392" y="20" width="168" height="204" fill="rgba(212,84,58,.05)" rx="2"/>
+
+            <!-- Zone labels -->
+            <text x="72" y="35" class="vf-zone-label" fill="rgba(110,231,168,.38)">Eficiente</text>
+            <text x="314" y="35" class="vf-zone-label" fill="rgba(249,115,22,.4)">Marginal</text>
+            <text x="396" y="35" class="vf-zone-label" fill="rgba(212,84,58,.38)">Desnecessário</text>
+
+            <!-- Horizontal grid (frequency) -->
+            <line x1="56" y1="195" x2="560" y2="195" stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+            <line x1="56" y1="151" x2="560" y2="151" stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+            <line x1="56" y1="113" x2="560" y2="113" stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+            <line x1="56" y1="84"  x2="560" y2="84"  stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+            <line x1="56" y1="55"  x2="560" y2="55"  stroke="rgba(255,255,255,.07)" stroke-width="1" stroke-dasharray="5,4"/>
+
+            <!-- Vertical grid (voltage) -->
+            <line x1="140" y1="20" x2="140" y2="224" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+            <line x1="224" y1="20" x2="224" y2="224" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+            <line x1="308" y1="20" x2="308" y2="224" stroke="rgba(255,255,255,.06)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="392" y1="20" x2="392" y2="224" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+            <line x1="476" y1="20" x2="476" y2="224" stroke="rgba(255,255,255,.03)" stroke-width="1"/>
+
+            <!-- Y axis labels (MHz) -->
+            <text x="50" y="199" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="end">1500</text>
+            <text x="50" y="155" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="end">1650</text>
+            <text x="50" y="117" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="end">1780</text>
+            <text x="50" y="88"  font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="end">1880</text>
+            <text x="50" y="59"  font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="end">1980</text>
+
+            <!-- X axis labels (mV) -->
+            <text x="56"  y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">800</text>
+            <text x="140" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">850</text>
+            <text x="224" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">900</text>
+            <text x="308" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">950</text>
+            <text x="392" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">1000</text>
+            <text x="476" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">1050</text>
+            <text x="560" y="240" font-family="'JetBrains Mono',monospace" font-size="9" fill="#5f5f67" text-anchor="middle">1100</text>
+
+            <!-- Axis unit labels -->
+            <text x="8" y="132" font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#3f3f46" text-anchor="middle" transform="rotate(-90,8,132)">MHz</text>
+            <text x="308" y="254" font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#3f3f46" text-anchor="middle">mV</text>
+
+            <!-- Curve fill -->
+            <polygon id="vfFill" points="56,195 98,151 140,113 182,84 224,64 266,56 308,55 392,55 476,55 560,55 560,224 56,224" fill="url(#cf)"/>
+
+            <!-- Curve line -->
+            <polyline id="vfLine" points="56,195 98,151 140,113 182,84 224,64 266,56 308,55 392,55 476,55 560,55" fill="none" stroke="url(#cg)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+            <!-- Plateau reference (flatten tail guide) -->
+            <line x1="56" y1="55" x2="560" y2="55" stroke="rgba(110,231,168,.15)" stroke-width="1" stroke-dasharray="6,4"/>
+
+            <!-- Live operating point with pulse -->
+            <line x1="194" y1="81" x2="194" y2="224" stroke="rgba(255,255,255,.08)" stroke-width="1" stroke-dasharray="3,3"/>
+            <circle cx="194" cy="81" r="4.5" fill="white" opacity=".85" filter="url(#lg)">
+              <animate attributeName="r" values="4.5;7;4.5" dur="2.4s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values=".85;.4;.85" dur="2.4s" repeatCount="indefinite"/>
+            </circle>
+            <text x="202" y="78" font-family="'JetBrains Mono',monospace" font-size="8.5" fill="rgba(255,255,255,.45)">882mV · 1890MHz</text>
+
+            <!-- Draggable nodes -->
+            <circle class="vf-node" data-i="0" cx="56"  cy="195" r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="800mV 1500MHz"/>
+            <circle class="vf-node" data-i="1" cx="98"  cy="151" r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="825mV 1650MHz"/>
+            <circle class="vf-node" data-i="2" cx="140" cy="113" r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="850mV 1780MHz"/>
+            <circle class="vf-node" data-i="3" cx="182" cy="84"  r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="875mV 1880MHz"/>
+            <circle class="vf-node" data-i="4" cx="224" cy="64"  r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="900mV 1950MHz"/>
+            <circle class="vf-node" data-i="5" cx="266" cy="56"  r="7" fill="#f97316" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="925mV 1975MHz"/>
+            <circle class="vf-node" data-i="6" cx="308" cy="55"  r="7.5" fill="#fcd34d" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="950mV 1980MHz — ponto de plateau"/>
+            <circle class="vf-node" data-i="7" cx="392" cy="55"  r="7" fill="#fcd34d" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="1000mV 1980MHz"/>
+            <circle class="vf-node" data-i="8" cx="476" cy="55"  r="7" fill="#fcd34d" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="1050mV 1980MHz"/>
+            <circle class="vf-node" data-i="9" cx="560" cy="55"  r="7" fill="#fcd34d" stroke="#0a0a0b" stroke-width="2.5" filter="url(#ng)" tabindex="0" aria-label="1100mV 1980MHz"/>
+          </svg>
+
+          <div class="vf-actions">
+            <button class="btn-ghost" id="flattenBtn">Travar cauda</button>
+            <button class="btn-ghost" id="resetCurveBtn">Resetar curva</button>
+            <span class="vf-hint" id="curveStatus">Ponto ativo: 882mV · 1890MHz · 67°C</span>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="panel">
+            <div class="panel-eyebrow">Offsets e limites</div>
+            <div class="tuner-row">
+              <div class="tuner-head"><span class="lbl">Clock da memória</span><span class="num">+800<span class="u"> MHz</span></span></div>
+              <input type="range" min="0" max="1500" value="800" aria-label="Offset memória"/>
+              <div class="tuner-scale"><span>0</span><span>+750</span><span>+1500</span></div>
+            </div>
+            <div class="tuner-row">
+              <div class="tuner-head"><span class="lbl">Limite de energia</span><span class="num">82<span class="u"> %</span></span></div>
+              <input type="range" min="50" max="112" value="82" aria-label="Power limit"/>
+              <div class="tuner-scale"><span>50%</span><span>80%</span><span>112%</span></div>
+            </div>
+            <div class="tuner-row" style="margin-bottom:8px">
+              <div class="tuner-head"><span class="lbl">Limite de temp.</span><span class="num">83<span class="u"> °C</span></span></div>
+              <input type="range" min="60" max="95" value="83" aria-label="Temp limit"/>
+              <div class="tuner-scale"><span>60°C</span><span>83°C</span><span>95°C</span></div>
+            </div>
+            <div class="tuner-actions">
+              <button class="btn-apply">Aplicar perfil</button>
+              <button class="btn-ghost">Padrão</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-eyebrow">Ao vivo <span class="pulse"></span></div>
+            <div class="live">
+              <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg> Temperatura</span><span class="mv temp-ok">67<span class="u">°C</span></span></div>
+              <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg> Uso</span><span class="mv">99<span class="u">%</span></span></div>
+              <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg> Clock real</span><span class="mv">1965<span class="u">MHz</span></span></div>
+              <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0M12 4v8l4 2"/></svg> Ventoinha</span><span class="mv">54<span class="u">%</span></span></div>
+              <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/></svg> VRAM</span><span class="mv">6.2<span class="u">/8 GB</span></span></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-eyebrow">Overlay em jogo (OSD)</div>
+            <div class="toggle-row">
+              <div><div class="tl">Exibir OSD</div><div class="ts">Ctrl + Shift + O</div></div>
+              <div class="switch on" role="switch" aria-checked="true" tabindex="0"></div>
+            </div>
+            <div class="toggle-row">
+              <div><div class="tl">FPS + frametime</div></div>
+              <div class="switch on" role="switch" aria-checked="true" tabindex="0"></div>
+            </div>
+            <div class="toggle-row">
+              <div><div class="tl">Temps CPU + GPU</div></div>
+              <div class="switch" role="switch" aria-checked="false" tabindex="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot-note">Curva V/F e offsets via NVAPI em espaço de usuário. Nenhum driver de kernel instalado — drag para moldar · setas do teclado para precisão.</div>
+    </section>
+
+    <!-- ========== SISTEMA (transparência / segurança) ========== -->
+    <section class="screen" id="sys">
+      <div class="head">
+        <div class="page-eyebrow">Sistema</div>
+        <h1 class="page-title">Ajustes do sistema</h1>
+        <p class="page-sub">3 itens reduzindo seu desempenho. Você vê exatamente o que cada um muda antes de aplicar.</p>
+      </div>
+
+      <div class="trust-banner">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <div><div class="t">Nada acontece sem você ver</div><div class="s">Cada ajuste mostra o valor antes e depois. Tudo fica registrado e pode ser revertido a qualquer momento.</div></div>
+      </div>
+
+      <div class="fix-card">
+        <div class="fc-top">
+          <span class="fc-sev crit"></span>
+          <div class="fc-main">
+            <div class="fc-title">Desativar telemetria DiagTrack</div>
+            <div class="fc-why">Serviço da Microsoft que coleta dados de uso e os envia em segundo plano. Desativar libera CPU e rede, sem afetar Windows Update ou jogos.</div>
+            <div class="fc-diff">
+              <span class="chip from">Em execução · automático</span>
+              <span class="arrow">→</span>
+              <span class="chip to">Desativado</span>
+            </div>
+            <div class="reversible"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg> Reversível · registrado em fix_log</div>
+          </div>
+          <div class="fc-actions"><button class="btn-apply">Aplicar</button></div>
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <div class="fc-top">
+          <span class="fc-sev warn"></span>
+          <div class="fc-main">
+            <div class="fc-title">Plano de energia: Alto Desempenho</div>
+            <div class="fc-why">O plano atual reduz o clock da CPU para economizar energia — ruim em jogos. Trocar mantém a CPU em frequência máxima sob carga.</div>
+            <div class="fc-diff">
+              <span class="chip from">Economia de energia</span>
+              <span class="arrow">→</span>
+              <span class="chip to">Alto desempenho</span>
+            </div>
+            <div class="reversible"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg> Reversível · registrado em fix_log</div>
+          </div>
+          <div class="fc-actions"><button class="btn-apply">Aplicar</button></div>
+        </div>
+      </div>
+
+      <div class="fix-card">
+        <div class="fc-top">
+          <span class="fc-sev warn"></span>
+          <div class="fc-main">
+            <div class="fc-title">Remover 4 tarefas agendadas de telemetria</div>
+            <div class="fc-why">Tarefas que rodam em segundo plano coletando dados de uso e compatibilidade. Remover não afeta a estabilidade do sistema.</div>
+            <div class="fc-diff">
+              <span class="chip from">4 tarefas ativas</span>
+              <span class="arrow">→</span>
+              <span class="chip to">0 tarefas</span>
+            </div>
+            <div class="reversible"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg> Reversível · registrado em fix_log</div>
+          </div>
+          <div class="fc-actions"><button class="btn-apply">Aplicar</button></div>
+        </div>
+      </div>
+
+      <div class="foot-note">Forge é código aberto. Você pode ler exatamente o que cada ajuste faz no GitHub.</div>
+    </section>
+
+    <!-- ========== HARDWARE ========== -->
+    <section class="screen" id="hw">
+      <div class="head">
+        <div class="page-eyebrow">Hardware</div>
+        <h1 class="page-title">Configuração de hardware</h1>
+        <p class="page-sub">RAM rodando na velocidade certa, energia configurada, discos saudáveis.</p>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="panel">
+          <div class="panel-eyebrow">Memória RAM</div>
+          <div style="display:flex;align-items:flex-end;gap:10px;margin-bottom:16px">
+            <span style="font-family:var(--f-display);font-size:42px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">3200</span>
+            <span style="font-family:var(--f-mono);color:var(--ash);margin-bottom:6px">MHz · XMP ativo</span>
+          </div>
+          <div class="fc-diff" style="margin-top:0">
+            <span class="chip" style="color:var(--ash)">Capacidade: 16 GB</span>
+            <span class="chip" style="color:var(--ash)">2× 8 GB Dual Channel</span>
+            <span class="chip to">XMP 3200 MHz</span>
+          </div>
+          <div style="margin-top:14px;padding:12px;border-radius:8px;background:linear-gradient(180deg,rgba(110,231,168,.07),transparent);border:1px solid rgba(110,231,168,.15);font-size:13px;color:#6ee7a8">RAM rodando na velocidade maxima — nada a fazer.</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-eyebrow">Plano de energia</div>
+          <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:8px;border:2px solid var(--forge);background:rgba(249,115,22,.07);cursor:pointer">
+              <input type="radio" name="pwr" checked style="accent-color:var(--forge)"/>
+              <div><div style="font-size:13.5px;font-weight:500">Alto desempenho</div><div style="font-size:12px;color:var(--ash);margin-top:2px">CPU em frequência máxima sob carga</div></div>
+            </label>
+            <label style="display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:8px;border:1px solid var(--edge);cursor:pointer">
+              <input type="radio" name="pwr" style="accent-color:var(--forge)"/>
+              <div><div style="font-size:13.5px;font-weight:500">Balanceado</div><div style="font-size:12px;color:var(--ash);margin-top:2px">Reduz clock quando ocioso</div></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-eyebrow">Saúde dos discos (S.M.A.R.T.)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash-dim)">
+              <th style="text-align:left;padding:0 14px 12px 0">Disco</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Tipo</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Capacidade</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Uso</th>
+              <th style="text-align:left;padding:0 14px 12px 0">Saúde</th>
+              <th style="text-align:left;padding:0 0 12px 0">Temp</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-top:1px solid var(--edge-soft)">
+                <td style="padding:13px 14px 13px 0;font-weight:500">Samsung 980 Pro</td>
+                <td style="padding:13px 14px 13px 0;font-family:var(--f-mono);font-size:12px;color:var(--hot)">NVMe</td>
+                <td style="padding:13px 14px 13px 0;color:var(--ash)">1 TB</td>
+                <td style="padding:13px 14px 13px 0;color:var(--ash)">312 GB / 931 GB</td>
+                <td style="padding:13px 14px 13px 0"><span style="color:#6ee7a8;font-family:var(--f-mono);font-size:12px">100% — Ótimo</span></td>
+                <td style="padding:13px 0;font-family:var(--f-mono)">42°C</td>
+              </tr>
+              <tr style="border-top:1px solid var(--edge-soft)">
+                <td style="padding:13px 14px 13px 0;font-weight:500">Seagate Barracuda</td>
+                <td style="padding:13px 14px 13px 0;font-family:var(--f-mono);font-size:12px;color:var(--ash-dim)">HDD</td>
+                <td style="padding:13px 14px 13px 0;color:var(--ash)">2 TB</td>
+                <td style="padding:13px 14px 13px 0;color:var(--ash)">1.1 TB / 1.8 TB</td>
+                <td style="padding:13px 14px 13px 0"><span style="color:#6ee7a8;font-family:var(--f-mono);font-size:12px">98% — Bom</span></td>
+                <td style="padding:13px 0;font-family:var(--f-mono)">35°C</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="foot-note">S.M.A.R.T. lido via WMI. Nenhum dado é enviado para fora do seu PC.</div>
+    </section>
+
+    <!-- ========== JOGOS ========== -->
+    <section class="screen" id="games">
+      <div class="head">
+        <div class="page-eyebrow">Jogos</div>
+        <h1 class="page-title">Perfis e detecção</h1>
+        <p class="page-sub">Forge detecta qual jogo está aberto e aplica o perfil certo automaticamente.</p>
+      </div>
+
+      <div class="panel" style="margin-bottom:18px">
+        <div class="panel-eyebrow">Auto Game Profile <span style="color:var(--forge)">ativo</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+          <div style="padding:16px;border:1px solid var(--edge-soft);border-radius:10px;background:var(--steel)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:14px;font-weight:500">Call of Duty: Warzone</span>
+              <span style="font-family:var(--f-mono);font-size:10px;color:var(--hot);padding:3px 8px;border-radius:20px;border:1px solid rgba(252,211,77,.25);background:rgba(252,211,77,.07)">EM EXECUÇÃO</span>
+            </div>
+            <div style="font-size:12px;color:var(--ash);margin-bottom:12px">Steam · C:\Games\cod_warzone · NVMe</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ash)">
+              <div style="display:flex;justify-content:space-between"><span>Prioridade do processo</span><span style="color:#6ee7a8;font-family:var(--f-mono)">Alta</span></div>
+              <div style="display:flex;justify-content:space-between"><span>GPU modo desempenho</span><span style="color:#6ee7a8;font-family:var(--f-mono)">Máximo</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Frame cap</span><span style="color:#6ee7a8;font-family:var(--f-mono)">179 FPS</span></div>
+            </div>
+          </div>
+
+          <div style="padding:16px;border:1px solid var(--edge-soft);border-radius:10px;background:var(--steel)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:14px;font-weight:500">Valorant</span>
+              <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 8px;border-radius:20px;border:1px solid var(--edge)">INATIVO</span>
+            </div>
+            <div style="font-size:12px;color:var(--ash);margin-bottom:12px">Riot Client · C:\Games\valorant · NVMe</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ash)">
+              <div style="display:flex;justify-content:space-between"><span>Prioridade do processo</span><span style="font-family:var(--f-mono)">Alta</span></div>
+              <div style="display:flex;justify-content:space-between"><span>GPU modo desempenho</span><span style="font-family:var(--f-mono)">Máximo</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Frame cap</span><span style="font-family:var(--f-mono)">179 FPS</span></div>
+            </div>
+          </div>
+
+          <div style="padding:16px;border:1px solid rgba(212,84,58,.25);border-radius:10px;background:rgba(212,84,58,.04)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:14px;font-weight:500">CS2</span>
+              <span style="font-family:var(--f-mono);font-size:10px;color:var(--danger);padding:3px 8px;border-radius:20px;border:1px solid rgba(212,84,58,.3);background:rgba(212,84,58,.08)">NO HDD</span>
+            </div>
+            <div style="font-size:12px;color:var(--ash);margin-bottom:10px">Steam · D:\Games\cs2 · HDD</div>
+            <div style="font-size:12.5px;color:var(--ash)">Mover pro SSD reduz tempo de carregamento em ~70%.</div>
+            <button class="mini-btn" style="margin-top:10px">Ver como mover</button>
+          </div>
+
+          <div style="padding:16px;border:1px solid var(--edge-soft);border-radius:10px;background:var(--steel)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:14px;font-weight:500">Fortnite</span>
+              <span style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);padding:3px 8px;border-radius:20px;border:1px solid var(--edge)">INATIVO</span>
+            </div>
+            <div style="font-size:12px;color:var(--ash);margin-bottom:12px">Epic Games · C:\Games\fortnite · NVMe</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ash)">
+              <div style="display:flex;justify-content:space-between"><span>Prioridade do processo</span><span style="font-family:var(--f-mono)">Alta</span></div>
+              <div style="display:flex;justify-content:space-between"><span>GPU modo desempenho</span><span style="font-family:var(--f-mono)">Máximo</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Frame cap</span><span style="font-family:var(--f-mono)">179 FPS</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot-note">Presets são embutidos no app — sem downloads de comunidade. Daemon detecta processo a cada 2s.</div>
+    </section>
+
+    <!-- ========== MONITOR ========== -->
+    <section class="screen" id="mon">
+      <div class="head">
+        <div class="page-eyebrow">Monitor</div>
+        <h1 class="page-title">Telemetria em tempo real</h1>
+        <p class="page-sub">Atualizado a cada 500ms pelo daemon.</p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
+        <div class="panel" style="text-align:center">
+          <div class="panel-eyebrow">FPS</div>
+          <div style="font-family:var(--f-display);font-size:56px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">143</div>
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash);margin-top:6px">1% low: 118</div>
+        </div>
+        <div class="panel" style="text-align:center">
+          <div class="panel-eyebrow">GPU</div>
+          <div style="font-family:var(--f-display);font-size:56px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">67°</div>
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash);margin-top:6px">99% uso · 1965 MHz</div>
+        </div>
+        <div class="panel" style="text-align:center">
+          <div class="panel-eyebrow">CPU</div>
+          <div style="font-family:var(--f-display);font-size:56px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--forge));-webkit-background-clip:text;background-clip:text;color:transparent">71°</div>
+          <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash);margin-top:6px">74% uso · 4.2 GHz</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-eyebrow">CPU por núcleo</div>
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:4px">
+            <!-- 6 cores Ryzen 5 3600 -->
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(180deg,var(--forge),var(--ember));border-radius:4px;width:100%;height:50px;background:linear-gradient(to top,var(--forge) 74%,var(--steel-2) 74%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C0<br>74%</div></div>
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(to top,var(--forge) 81%,var(--steel-2) 81%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C1<br>81%</div></div>
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(to top,var(--forge) 68%,var(--steel-2) 68%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C2<br>68%</div></div>
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(to top,var(--forge) 55%,var(--steel-2) 55%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C3<br>55%</div></div>
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(to top,var(--forge) 70%,var(--steel-2) 70%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C4<br>70%</div></div>
+            <div style="text-align:center"><div style="height:50px;background:linear-gradient(to top,var(--forge) 62%,var(--steel-2) 62%);border-radius:4px"></div><div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:5px">C5<br>62%</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-eyebrow">RAM · Disco</div>
+          <div class="live">
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5M10 7V5M14 7V5M18 7V5"/></svg> RAM usada</span><span class="mv">10.4<span class="u">/16 GB</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7V5M10 7V5M14 7V5M18 7V5"/></svg> RAM %</span><span class="mv">65<span class="u">%</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8"/><rect x="1" y="16" width="22" height="4" rx="1"/></svg> SSD leitura</span><span class="mv">1.2<span class="u">GB/s</span></span></div>
+            <div class="metric"><span class="ml"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8"/><rect x="1" y="16" width="22" height="4" rx="1"/></svg> SSD escrita</span><span class="mv">340<span class="u">MB/s</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px">
+        <!-- Process Monitor (NZXT CAM–style) -->
+        <div class="panel">
+          <div class="panel-eyebrow">Processos — maior consumo <span class="pulse"></span></div>
+          <div class="proc-head">
+            <span>Processo</span>
+            <span style="text-align:right">CPU</span>
+            <span style="text-align:right">RAM</span>
+            <span style="text-align:right">GPU</span>
+          </div>
+          <div class="proc-list">
+            <div class="proc-row">
+              <span class="proc-name">cod_hq.exe</span>
+              <span class="proc-val hi">38%</span>
+              <span class="proc-val">3.1GB</span>
+              <span class="proc-val hi">99%</span>
+            </div>
+            <div class="proc-row">
+              <span class="proc-name">chrome.exe</span>
+              <span class="proc-val hi">12%</span>
+              <span class="proc-val">1.8GB</span>
+              <span class="proc-val">2%</span>
+            </div>
+            <div class="proc-row">
+              <span class="proc-name">Discord.exe</span>
+              <span class="proc-val">4%</span>
+              <span class="proc-val">320MB</span>
+              <span class="proc-val">1%</span>
+            </div>
+            <div class="proc-row">
+              <span class="proc-name">obs64.exe</span>
+              <span class="proc-val">6%</span>
+              <span class="proc-val">540MB</span>
+              <span class="proc-val hi">8%</span>
+            </div>
+            <div class="proc-row">
+              <span class="proc-name">MsMpEng.exe</span>
+              <span class="proc-val">3%</span>
+              <span class="proc-val">210MB</span>
+              <span class="proc-val">0%</span>
+            </div>
+            <div class="proc-row">
+              <span class="proc-name">forge-daemon.exe</span>
+              <span class="proc-val">0.1%</span>
+              <span class="proc-val">18MB</span>
+              <span class="proc-val">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sensor Alerts (HWiNFO–style) -->
+        <div class="panel">
+          <div class="panel-eyebrow">Alertas de sensor</div>
+
+          <div class="toast-demo" style="margin-bottom:14px">
+            <div class="td-ic">
+              <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div class="td-title" style="color:#f0a08c">GPU acima de 85°C</div>
+              <div class="td-sub">Temperatura detectada: <span style="font-family:var(--f-mono);color:var(--forge)">87°C</span> — acima do limite definido</div>
+              <div class="td-actions">
+                <button class="td-fix">Forçar ventoinhas</button>
+                <button class="td-dismiss">Ignorar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toast-label">Limites configurados</div>
+          <div class="proc-list">
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">GPU temperatura</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">85°C</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:#f0a08c">Ativo</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">CPU temperatura</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">90°C</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">VRAM uso</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">90%</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+            <div class="proc-row" style="grid-template-columns:1fr 70px 60px">
+              <span class="proc-name">RAM uso</span>
+              <span class="proc-val" style="text-align:right;font-size:12px">85%</span>
+              <span style="font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--ash)">OK</span>
+            </div>
+          </div>
+          <button class="btn-ghost" style="margin-top:14px;width:100%;justify-content:center;display:flex">Configurar alertas</button>
+        </div>
+      </div>
+
+      <div class="foot-note">Daemon coleta a cada 500ms. Zero overhead em jogo — pipe local, sem rede.</div>
+    </section>
+
+    <!-- ========== HISTÓRICO ========== -->
+    <section class="screen" id="hist">
+      <div class="head">
+        <div class="page-eyebrow">Histórico</div>
+        <h1 class="page-title">Evolução do seu PC</h1>
+        <p class="page-sub">Do estado cru até hoje — cada ponto no gráfico é uma leitura real.</p>
+      </div>
+
+      <!-- before/after card -->
+      <div style="margin-bottom:20px;padding:28px;border-radius:var(--r-card);background:var(--anvil);border:1px solid var(--edge-soft);position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(59,74,107,.25),transparent 60%),radial-gradient(ellipse at 70% 50%,rgba(252,211,77,.1),transparent 55%);pointer-events:none"></div>
+        <div style="font-family:var(--f-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ash-dim);margin-bottom:20px">Card antes/depois · exportável em PNG</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:48px">
+          <div style="text-align:center">
+            <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash-dim);margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase">Dia 0</div>
+            <div style="font-family:var(--f-display);font-size:72px;font-weight:600;line-height:1;color:#3b4a6b">34</div>
+            <div style="font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:4px">/ 100</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+            <svg width="48" height="16" viewBox="0 0 48 16" fill="none"><path d="M0 8h40M33 2l8 6-8 6" stroke="#5f5f67" stroke-width="2" stroke-linecap="round"/></svg>
+            <div style="font-family:var(--f-mono);font-size:12px;color:#6ee7a8;font-weight:600">+57 pts</div>
+            <div style="font-family:var(--f-mono);font-size:10px;color:var(--ash-dim)">14 dias</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-family:var(--f-mono);font-size:11px;color:var(--ash-dim);margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase">Hoje</div>
+            <div style="font-family:var(--f-display);font-size:72px;font-weight:600;line-height:1;background:linear-gradient(180deg,#fff,var(--hot));-webkit-background-clip:text;background-clip:text;color:transparent">91</div>
+            <div style="font-family:var(--f-mono);font-size:12px;color:var(--ash-dim);margin-top:4px">/ 100</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:24px;border-top:1px solid var(--edge-soft);padding-top:20px">
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Sistema</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+30</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Hardware</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+9</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">GPU</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+18</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Jogos</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+12</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:11px;color:var(--ash-dim);margin-bottom:4px">Monitor</div><div style="font-family:var(--f-mono);font-size:13px;color:#6ee7a8">+0</div></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px">
+          <button class="btn-apply" style="display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a0e00" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar card (PNG)
+          </button>
+        </div>
+      </div>
+
+      <!-- full timeline -->
+      <div class="panel">
+        <div class="panel-eyebrow">Linha do tempo completa · 14 dias</div>
+        <svg width="100%" height="180" viewBox="0 0 800 180" preserveAspectRatio="none" aria-label="Histórico de score">
+          <defs>
+            <linearGradient id="fill2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f97316" stop-opacity=".3"/><stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="line2" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#3b4a6b"/><stop offset=".5" stop-color="#f97316"/><stop offset="1" stop-color="#fcd34d"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,155 L57,145 L114,128 L171,115 L228,95 L285,78 L342,62 L400,42 L457,98 L514,80 L571,56 L628,40 L685,30 L742,24 L800,20 L800,180 L0,180 Z" fill="url(#fill2)"/>
+          <path d="M0,155 L57,145 L114,128 L171,115 L228,95 L285,78 L342,62 L400,42 L457,98 L514,80 L571,56 L628,40 L685,30 L742,24 L800,20" fill="none" stroke="url(#line2)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <!-- WU event marker -->
+          <line x1="457" y1="0" x2="457" y2="180" stroke="rgba(212,84,58,.3)" stroke-width="1" stroke-dasharray="4,4"/>
+          <circle cx="457" cy="98" r="5" fill="#d4543a" stroke="#141416" stroke-width="2"/>
+          <circle cx="800" cy="20" r="5.5" fill="#fcd34d" stroke="#141416" stroke-width="2"/>
+        </svg>
+        <div style="display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10px;color:var(--ash-dim);margin-top:8px">
+          <span>06/06 · 34pts</span><span style="color:var(--danger)">15/06 · Windows Update</span><span>20/06 · 91pts</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // screen switching
+  const items=document.querySelectorAll('.nav-item[data-screen]');
+  const screens=document.querySelectorAll('.screen');
+  // deep-link: ?screen=gpu activates a screen on load
+  const wanted=new URLSearchParams(location.search).get('screen');
+  if(wanted){
+    screens.forEach(s=>s.classList.toggle('active',s.id===wanted));
+    items.forEach(i=>i.classList.toggle('active',i.dataset.screen===wanted));
+  }
+  items.forEach(it=>it.addEventListener('click',e=>{
+    e.preventDefault();
+    const id=it.dataset.screen;
+    items.forEach(i=>i.classList.toggle('active',i===it));
+    screens.forEach(s=>s.classList.toggle('active',s.id===id));
+    window.scrollTo({top:0,behavior:'instant'});
+  }));
+  // toggles
+  document.querySelectorAll('.switch').forEach(s=>{
+    const flip=()=>{const on=s.classList.toggle('on');s.setAttribute('aria-checked',on);};
+    s.addEventListener('click',flip);
+    s.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();flip();}});
+  });
+  // live range fill
+  document.querySelectorAll('input[type=range]').forEach(r=>{
+    const paint=()=>{const p=(r.value-r.min)/(r.max-r.min)*100;
+      r.style.background=`linear-gradient(90deg,var(--ember),var(--forge) ${p}%,var(--steel-2) ${p}%)`;};
+    paint(); r.addEventListener('input',paint);
+  });
+
+  // ==========================================
+  // V/F CURVE EDITOR
+  // ==========================================
+  (function(){
+    const svg=document.getElementById('vfSvg');
+    if(!svg) return;
+
+    // Coordinate bounds
+    const X0=56,X1=560,Y0=20,Y1=224;
+    const VoltMin=800,VoltMax=1100,FreqMin=1400,FreqMax=2100;
+
+    // Default node positions (cx, cy in SVG coords)
+    const defaults=[[56,195],[98,151],[140,113],[182,84],[224,64],[266,56],[308,55],[392,55],[476,55],[560,55]];
+    let nodes=defaults.map(d=>[...d]);
+
+    // Convert SVG coords to physical values
+    const toVolt=x=>Math.round(VoltMin+(x-X0)/(X1-X0)*(VoltMax-VoltMin));
+    const toFreq=y=>Math.round(FreqMax-(y-Y0)/(Y1-Y0)*(FreqMax-FreqMin));
+    const fromVolt=v=>X0+(v-VoltMin)/(VoltMax-VoltMin)*(X1-X0);
+    const fromFreq=f=>Y0+(FreqMax-f)/(FreqMax-FreqMin)*(Y1-Y0);
+
+    const circles=Array.from(svg.querySelectorAll('.vf-node'));
+    const line=document.getElementById('vfLine');
+    const fill=document.getElementById('vfFill');
+    const status=document.getElementById('curveStatus');
+
+    function clampX(x,i){
+      const lo=i===0?X0:nodes[i-1][0]+2;
+      const hi=i===nodes.length-1?X1:nodes[i+1][0]-2;
+      return Math.max(lo,Math.min(hi,x));
+    }
+    function clampY(y){return Math.max(Y0+2,Math.min(Y1-2,y));}
+
+    function updateSvg(){
+      const pts=nodes.map(n=>n.join(',')).join(' ');
+      line.setAttribute('points',pts);
+      fill.setAttribute('points',pts+` ${X1},${Y1} ${X0},${Y1}`);
+      circles.forEach((c,i)=>{
+        c.setAttribute('cx',nodes[i][0]);
+        c.setAttribute('cy',nodes[i][1]);
+        const v=toVolt(nodes[i][0]),f=toFreq(nodes[i][1]);
+        c.setAttribute('aria-label',`${v}mV ${f}MHz`);
+      });
+    }
+
+    function updateStatus(i){
+      const v=toVolt(nodes[i][0]),f=toFreq(nodes[i][1]);
+      if(status) status.textContent=`Ponto ${i+1}: ${v}mV · ${f}MHz`;
+    }
+
+    // Drag logic
+    let dragging=null;
+    function svgPt(e){
+      const pt=svg.createSVGPoint();
+      const src=e.touches?e.touches[0]:e;
+      pt.x=src.clientX; pt.y=src.clientY;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    circles.forEach((c,i)=>{
+      const startDrag=e=>{
+        e.preventDefault();
+        dragging=i;
+        c.style.r='9';
+      };
+      c.addEventListener('mousedown',startDrag);
+      c.addEventListener('touchstart',startDrag,{passive:false});
+
+      // Keyboard: arrows nudge by 1 unit
+      c.addEventListener('keydown',e=>{
+        const step=e.shiftKey?5:1;
+        let [x,y]=nodes[i];
+        if(e.key==='ArrowLeft'){x=clampX(x-step,i);}
+        else if(e.key==='ArrowRight'){x=clampX(x+step,i);}
+        else if(e.key==='ArrowUp'){y=clampY(y-step);}
+        else if(e.key==='ArrowDown'){y=clampY(y+step);}
+        else return;
+        e.preventDefault();
+        nodes[i]=[x,y];
+        updateSvg();
+        updateStatus(i);
+      });
+    });
+
+    const onMove=e=>{
+      if(dragging===null) return;
+      e.preventDefault();
+      const pt=svgPt(e);
+      const x=clampX(pt.x,dragging);
+      const y=clampY(pt.y);
+      nodes[dragging]=[x,y];
+      updateSvg();
+      updateStatus(dragging);
+    };
+    const onUp=()=>{
+      if(dragging!==null){circles[dragging].style.r='';dragging=null;}
+    };
+    svg.addEventListener('mousemove',onMove);
+    svg.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchend',onUp);
+
+    // Flatten tail — set all nodes from flatten-point rightward to same Y
+    document.getElementById('flattenBtn')?.addEventListener('click',()=>{
+      // Find elbow: last significant rise (diff > 8px in y)
+      let elbowIdx=nodes.length-1;
+      for(let i=1;i<nodes.length;i++){
+        if(Math.abs(nodes[i][1]-nodes[i-1][1])>6){elbowIdx=i;}
+      }
+      const flatY=nodes[elbowIdx][1];
+      for(let i=elbowIdx;i<nodes.length;i++) nodes[i][1]=flatY;
+      updateSvg();
+      if(status) status.textContent='Cauda travada — plateau aplicado';
+    });
+
+    // Reset curve
+    document.getElementById('resetCurveBtn')?.addEventListener('click',()=>{
+      nodes=defaults.map(d=>[...d]);
+      updateSvg();
+      if(status) status.textContent='Curva restaurada ao padrão';
+    });
+
+    // Profile chips
+    const profiles={
+      gaming:[[56,195],[98,151],[140,113],[182,84],[224,64],[266,56],[308,55],[392,55],[476,55],[560,55]],
+      silent:[[56,209],[98,180],[140,152],[182,130],[224,115],[266,108],[308,106],[392,106],[476,106],[560,106]],
+      turbo: [[56,185],[98,138],[140,98],[182,68],[224,46],[266,40],[308,38],[392,38],[476,38],[560,38]],
+      custom1:null,custom2:null
+    };
+    document.querySelectorAll('.chip-btn[data-profile]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.chip-btn').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        const p=profiles[btn.dataset.profile];
+        if(p){nodes=p.map(d=>[...d]);updateSvg();}
+      });
+    });
+
+    // Auto-tune (demo animation)
+    document.getElementById('autotuneBtn')?.addEventListener('click',function(){
+      this.disabled=true;
+      this.textContent='Analisando...';
+      let t=0;
+      const anim=setInterval(()=>{
+        t++;
+        nodes.forEach((n,i)=>{
+          n[1]=Math.max(Y0+2,Math.min(Y1-2,n[1]+(Math.random()-0.5)*10));
+        });
+        updateSvg();
+        if(t>18){
+          clearInterval(anim);
+          nodes=profiles.gaming.map(d=>[...d]);
+          updateSvg();
+          if(status) status.textContent='Auto-tune: perfil Gaming otimizado aplicado';
+          this.disabled=false;
+          this.innerHTML=`<svg viewBox="0 0 24 24" width="16" height="16" stroke="var(--hot)" stroke-width="1.8" fill="none"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg> Otimizar automaticamente`;
+        }
+      },60);
+    });
+
+    updateSvg();
+  })();
+</script>
+</body>
+</html>

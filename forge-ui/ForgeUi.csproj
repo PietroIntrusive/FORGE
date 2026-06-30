@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Forge UI shell. The UNPRIVILEGED front-end: a native window + system tray that
+       hosts the existing dashboard (served by the daemon at 127.0.0.1:5172) inside a
+       WebView2. It never touches the system directly — every change goes through the
+       daemon's audited, CSRF-protected IPC. Regular JIT exe on purpose: WebView2 +
+       WinForms don't pair cleanly with NativeAOT, and the front doesn't need it.
+       The daemon stays NativeAOT. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>forge-ui</AssemblyName>
+    <RootNamespace>ForgeUi</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Stamps the exe so Explorer, taskbar and the installer all show the forge mark. -->
+    <ApplicationIcon>forge.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+  </ItemGroup>
+
+  <!-- Same multi-size .ico embedded so the window/tray load real 256/48/32/16 frames
+       at runtime instead of a code-drawn approximation. -->
+  <ItemGroup>
+    <EmbeddedResource Include="forge.ico" />
+  </ItemGroup>
+
+</Project>

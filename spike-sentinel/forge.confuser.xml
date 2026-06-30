@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ConfuserEx2 project for ForgeSentinel (hardened release only).
+
+  IMPORTANT — net10 reality check:
+    ConfuserEx2's "anti tamper" and "compressor/packer" protections rewrite the
+    PE / inject native stubs and are known to break on newer .NET runtimes. They
+    are deliberately NOT enabled here. IL-level transforms (rename, control flow,
+    constants/string encryption, reference proxy) are runtime-agnostic and safe.
+    For true anti-reversal on net10, prefer Native AOT (see BUILD-HARDENING.md) —
+    it removes IL/metadata entirely, which no IL obfuscator can match.
+
+  baseDir/outputDir are relative to THIS file (repo: spike-sentinel/).
+  Adjust the TFM folder if your build path differs.
+-->
+<project outputDir="bin\Release\obfuscated" baseDir="bin\Release\net10.0-windows10.0.19041.0" xmlns="http://confuser.codeplex.com">
+
+  <rule pattern="true" inherit="false">
+    <!-- Overload induction + renaming: many members collapse to the same name. -->
+    <protection id="rename" />
+    <!-- Shatters method bodies so a decompiler can't reconstruct linear logic. -->
+    <protection id="ctrl flow" />
+    <!-- Encrypts string/number constants (hides API names, paths, messages). -->
+    <protection id="constants" />
+    <!-- Indirects method calls through generated proxies. -->
+    <protection id="ref proxy" />
+    <!-- Encrypts embedded resources. -->
+    <protection id="resources" />
+  </rule>
+
+  <module path="ForgeSentinel.dll" />
+</project>

@@ -1,0 +1,21 @@
+# Build output
+**/bin/
+**/obj/
+*.user
+
+# WebView2 runtime cache
+**/EBWebView/
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vs/
+*.swp
+
+# Logs / temp
+*.log
+/tmp/
+
+# Local Forge state (baseline, fix log are per-machine)
+*.forgebaseline
+fix_log*.json
