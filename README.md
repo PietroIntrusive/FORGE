@@ -16,6 +16,21 @@ Forge substitui uma pilha de ferramentas desconexas (MSI Afterburner, HWiNFO, sc
 
 > Quanto mais quente o medidor, mais perto da forma ideal. Otimizar seu PC é como forjar metal: do estado cru e frio até a temperatura de forja.
 
+## Baixar e instalar
+
+1. Vá em **[Releases](https://github.com/PietroIntrusive/FORGE/releases)** e baixe o `forge-setup.exe` mais recente.
+2. Execute. Como o instalador ainda **não é assinado** (assinatura open-source via SignPath a caminho), o Windows SmartScreen mostra "Editor desconhecido" — clique em **Mais informações → Executar assim mesmo**.
+3. Next → Install. A Forja abre e passa a viver na bandeja; o motor sobe sozinho no login.
+
+**Requisitos:** Windows 10 (1903+) ou 11, 64-bit. GPU NVIDIA para os recursos de GPU. O runtime do WebView2 é instalado automaticamente se faltar.
+
+**Verificar o download (opcional):** compare o SHA-256 publicado na página da Release:
+```powershell
+Get-FileHash forge-setup.exe -Algorithm SHA256
+```
+
+> **Nota:** esta é uma pré-versão (v1.0 lean) para teste. Recursos marcados "em breve" na UI (undervolt/curva V/F, OSD, histórico) chegam depois. Nada na tela é falso: ou é dado real, ou está honestamente marcado como pendente.
+
 ## Por que o Forge é diferente
 
 - **Score 0–100 com diagnóstico claro** — chega de planilha de números. "Seu PC: 78/100, 3 ajustes pendentes."
