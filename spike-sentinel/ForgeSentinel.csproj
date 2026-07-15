@@ -11,7 +11,7 @@
          porque PlatformConsole.Init() anexa ao console do processo pai. -->
     <OutputType>WinExe</OutputType>
     <!-- Versão exposta na UI (topbar/Sobre) via /api/status. -->
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
 
     <!-- Hardened build: turns on anti-debug / tamper checks (IntegrityGuard).
          OFF by default so normal dev/debug isn't sabotaged by our own defenses.

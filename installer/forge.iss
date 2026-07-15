@@ -11,7 +11,7 @@
 ;   - opcionalmente registra a Forja para iniciar com o Windows (HKCU\...\Run)
 
 #define AppName "Forge"
-#define AppVersion "1.1.1"
+#define AppVersion "1.1.2"
 #define AppPublisher "Forge"
 #define AppExe "forge-ui.exe"
 
@@ -42,8 +42,15 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDescription: "Atalhos:"
 ; Recomendado: deixa o motor da Forja sempre pronto. Sem isso, a primeira abertura
 ; da Forja em cada sessão pede uma confirmação do Windows (UAC) para subir o motor.
-Name: "daemontask"; Description: "Manter a Forja pronta (sobe o motor no logon, sem pedir permissão toda vez)"; GroupDescription: "Inicialização:"
+; Consentimento explícito: o texto diz o QUE roda em segundo plano e onde desligar.
+Name: "daemontask"; Description: "Iniciar o motor da Forja com o Windows — vigia regressões em segundo plano (recomendado; desligue quando quiser em Ajustes > Inicialização)"; GroupDescription: "Inicialização:"
 Name: "startup"; Description: "Abrir a janela da Forja junto com o Windows"; GroupDescription: "Inicialização:"; Flags: unchecked
+
+[InstallDelete]
+; Upgrade limpo: o payload self-contained muda de arquivos entre versões — DLL
+; órfã da versão anterior não pode sobrar carregável. Só payload mora em {app};
+; dados do usuário (baseline, histórico, ajustes) vivem no perfil/%LOCALAPPDATA%.
+Type: filesandordirs; Name: "{app}"
 
 [Files]
 ; Payload gerado por publish.ps1.
@@ -141,8 +148,41 @@ begin
     Exec(exe, '/silent /install', '', SW_SHOW, ewWaitUntilTerminated, code);
 end;
 
+// Para os processos da versão instalada antes de copiar por cima: exe travado
+// em execução = upgrade quebrado no meio (feedback do beta).
+procedure KillRunning;
+var
+  code: Integer;
+begin
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/end /tn "ForgeSentinel"', '',
+       SW_HIDE, ewWaitUntilTerminated, code);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im ForgeSentinel.exe', '',
+       SW_HIDE, ewWaitUntilTerminated, code);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /im forge-ui.exe', '',
+       SW_HIDE, ewWaitUntilTerminated, code);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssInstall then
+    KillRunning;
   if CurStep = ssPostInstall then
     EnsureWebView2;
+end;
+
+// Instalação por cima de versão anterior: avisa que é um upgrade em vez de
+// seguir mudo (feedback do beta v1.1.1). A chave de desinstalação usa o AppId
+// com sufixo _is1; o modo 64-bit do setup lê a view 64-bit do registro.
+function InitializeSetup(): Boolean;
+var
+  prev: string;
+begin
+  Result := True;
+  if RegQueryStringValue(HKLM,
+       'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7F4B3B2-7C2E-4E2A-9C5E-F0A6E2A8C635}_is1',
+       'DisplayVersion', prev)
+     and (prev <> '') and (prev <> '{#AppVersion}') then
+    MsgBox('Forge v' + prev + ' detectado neste PC.' + #13#10 +
+           'Ele será atualizado para a v{#AppVersion} — suas configurações e baseline são mantidos.',
+           mbInformation, MB_OK);
 end;
