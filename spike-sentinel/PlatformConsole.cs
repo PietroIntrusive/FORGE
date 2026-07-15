@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32;
 
@@ -15,8 +16,25 @@ static class PlatformConsole
     // Windows 10 build 1909 == 18363. Below this, do not touch the code page.
     const int MinBuildForUtf8 = 18363;
 
+    // O exe é WinExe (sem console próprio). Para os verbos de CLI ainda imprimirem
+    // quando chamados de um terminal, anexamos ao console do pai — mas SÓ quando o
+    // processo nasceu sem stdout: com saída redirecionada (pipe/arquivo) os handles
+    // já chegam prontos e anexar os sobrescreveria, quebrando o redirecionamento.
+    // Lançado pela tarefa agendada ou pela UI não há console pai, a chamada falha
+    // em silêncio e todo Console.* vira no-op — nenhuma janela, que é o objetivo.
+    [DllImport("kernel32.dll")]
+    static extern bool AttachConsole(int processId);
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetStdHandle(int nStdHandle);
+    const int AttachParentProcess = -1;
+    const int StdOutputHandle = -11;
+
     public static void Init()
     {
+        var stdout = GetStdHandle(StdOutputHandle);
+        if (stdout == IntPtr.Zero || stdout == new IntPtr(-1))
+            AttachConsole(AttachParentProcess);
+
         if (CurrentBuild() >= MinBuildForUtf8)
         {
             try { Console.OutputEncoding = Encoding.UTF8; }

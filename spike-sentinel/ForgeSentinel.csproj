@@ -6,6 +6,12 @@
     <RootNamespace>ForgeSentinel</RootNamespace>
     <AssemblyName>ForgeSentinel</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- WinExe: sem janela de console quando o daemon sobe via tarefa agendada ou
+         pela UI (EnsureDaemon). O CLI continua funcionando num terminal existente
+         porque PlatformConsole.Init() anexa ao console do processo pai. -->
+    <OutputType>WinExe</OutputType>
+    <!-- Versão exposta na UI (topbar/Sobre) via /api/status. -->
+    <Version>1.1.1</Version>
 
     <!-- Hardened build: turns on anti-debug / tamper checks (IntegrityGuard).
          OFF by default so normal dev/debug isn't sabotaged by our own defenses.
