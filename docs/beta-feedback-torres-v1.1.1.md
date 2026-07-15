@@ -16,6 +16,12 @@ Primeiro teste externo real. 13 itens triados por prioridade.
   proprietária · beta, repo real).
 - 🔴 NOVO (aguardando dados): "uso da GPU errado em jogo" — precisa: GPU do
   Torres (NVIDIA?), valor no Forge vs Afterburner/Gerenciador no mesmo momento.
+  Hipótese: se for AMD/Intel, o app mostra dado inválido em vez de explicar.
+- 🔴 NOVO (retela GPU, junto com power limiter): sem placa NVIDIA, a tela GPU
+  precisa EXPLICAR a limitação — "telemetria e tuning cobrem só NVIDIA (via
+  oficial do driver); não mexemos em GPU sem caminho seguro" — em vez de
+  gauges vazios/valores errados. Detectar o modelo real (Win32_VideoController)
+  e nomear a placa no aviso.
 - ⏳ Pendentes: power limiter (knob + confirmação + tutorial), loop de feedback
   visual pós-ação, reverter descobrível, caçador de drivers.
 
