@@ -11,7 +11,7 @@
 ;   - opcionalmente registra a Forja para iniciar com o Windows (HKCU\...\Run)
 
 #define AppName "Forge"
-#define AppVersion "1.1.2"
+#define AppVersion "1.1.3"
 #define AppPublisher "Forge"
 #define AppExe "forge-ui.exe"
 

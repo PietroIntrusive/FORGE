@@ -68,6 +68,13 @@ static class ApiServer
         // antes do primeiro poll da UI — o caminho quente nunca spawna PowerShell.
         SystemTelemetry.PrimeAtStartup();
 
+        // Faxina de zumbis: versões <=1.1.1 spawnavam powershell.exe por poll e
+        // acumulavam órfãos sob carga de jogo (82 numa máquina de dev). Mata só
+        // quem tem assinatura dos NOSSOS scripts E >2min de vida — poupa o
+        // PowerShell do usuário, o próprio sweep e os passes novos (que já
+        // morrem em 8s pelo teto do RunPs).
+        _ = Task.Run(() => RunPs(ZombieSweepScript));
+
         using var listener = new HttpListener();
         // Loopback IP literal, not "+"/"*": binds without elevation on Win7+.
         listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
@@ -479,6 +486,17 @@ static class ApiServer
         try { Close(res, SystemTelemetry.MonitorJson()); }
         catch { Close(res, "{\"available\":false}"); }
     }
+
+    // Assinaturas exclusivas dos scripts de telemetria/jogos das versões antigas
+    // (e dos passes frios atuais, cobertos pela idade mínima de 2 minutos).
+    const string ZombieSweepScript =
+        "$ErrorActionPreference='SilentlyContinue';" +
+        "$cut=(Get-Date).AddMinutes(-2);" +
+        "Get-CimInstance Win32_Process -Filter 'Name=''powershell.exe''' |" +
+        "Where-Object {$_.ProcessId -ne $PID -and " +
+            "$_.CommandLine -match 'Win32_PerfFormattedData|StorageReliabilityCounter|libraryfolders' -and " +
+            "$_.CreationDate -lt $cut}|" +
+        "ForEach-Object {Stop-Process -Id $_.ProcessId -Force}";
 
     // ---- Autostart do motor (tarefa de logon ForgeSentinel) ---------------------
     // Confiança > conveniência: iniciar com o Windows é escolha visível do usuário

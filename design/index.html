@@ -633,7 +633,7 @@
     <!-- ========== GPU ========== -->
     <section class="screen" id="gpu">
       <div class="head">
-        <div class="page-eyebrow">NVIDIA GeForce RTX 3060 Ti · Driver 572.83</div>
+        <div class="page-eyebrow" id="gpu-eyebrow">GPU — detectando…</div>
         <h1 class="page-title">Ajuste de GPU</h1>
         <p class="page-sub">Telemetria ao vivo e limite de energia via nvidia-smi. Reversível, com auto-reverte. Undervolt e curva V/F (NVAPI) chegam na Fase 2.</p>
       </div>
@@ -642,10 +642,13 @@
       <div class="vf-grid">
         <div style="display:flex;flex-direction:column;gap:14px">
 
-          <!-- Power limit: REAL via nvidia-smi -pl. Reversível + auto-reverte. -->
-          <div class="panel">
+          <!-- Power limit: REAL via nvidia-smi -pl. Reversível + auto-reverte.
+               Gate educativo: controles nascem borrados; liberar exige ler o guia
+               (1x por PC, localStorage). Usuário nunca mexe no que não entende. -->
+          <div class="panel" style="position:relative">
             <div class="panel-eyebrow"><span class="pe-l"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>Limite de energia</span> <span class="pulse"></span></div>
             <p style="font-size:12.5px;color:var(--ash);margin:0 0 16px;line-height:1.5">Menos watts = menos calor e consumo (clocks caem sob carga pesada). Aplica via nvidia-smi, revers&iacute;vel, e <b style="color:var(--chrome)">auto-reverte em 15s</b> se voc&ecirc; n&atilde;o confirmar.</p>
+            <div id="pl-body">
             <div class="tuner-row">
               <div class="tuner-head"><span class="lbl">Power limit</span><span class="num"><span id="pl-watts">&mdash;</span><span class="u"> W</span></span></div>
               <input type="range" id="pl-slider" min="0" max="100" value="0" disabled aria-label="Limite de energia em watts"/>
@@ -659,6 +662,11 @@
             <div id="pl-confirm" style="display:none;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;border-radius:10px;background:rgba(252,211,77,.08);border:1px solid rgba(252,211,77,.25)">
               <span style="font-size:13px;color:var(--chrome);flex:1">Reverte em <span id="pl-count" style="font-family:var(--f-mono);color:var(--hot)">15</span>s. Est&aacute;vel?</span>
               <button class="btn-apply" id="pl-keep" style="padding:7px 16px">Manter</button>
+            </div>
+            </div><!-- /pl-body -->
+            <div id="pl-lock" style="position:absolute;left:0;right:0;bottom:0;top:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:2;border-radius:0 0 var(--r-card) var(--r-card)">
+              <span style="font-size:12.5px;color:var(--chrome);max-width:340px;text-align:center;line-height:1.55">Este controle mexe na sua placa de v&iacute;deo. Leia o guia de 1 minuto e libere &mdash; s&oacute; precisa uma vez.</span>
+              <button class="btn-apply" id="pl-guide-open">Entender o limite de energia</button>
             </div>
           </div>
 
@@ -681,6 +689,25 @@
           </div>
         </div>
       </div><!-- /vf-grid -->
+
+      <!-- Guia do power limit: gate educativo, abre do cadeado do card -->
+      <div id="pl-guide" style="display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:rgba(4,4,6,.62);backdrop-filter:blur(4px)">
+        <div style="width:min(560px,92vw);max-height:86vh;overflow:auto;background:linear-gradient(180deg,var(--steel),var(--anvil));border:1px solid var(--edge);border-radius:16px;padding:26px 28px;box-shadow:0 24px 80px rgba(0,0,0,.6)">
+          <h3 style="margin:0 0 4px;font-family:var(--f-display);font-size:19px;color:var(--chrome)">Limite de energia, sem mist&eacute;rio</h3>
+          <p style="margin:0 0 16px;font-size:12.5px;color:var(--ash-dim)">1 minuto de leitura. Depois o controle fica liberado neste PC.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--ash);line-height:1.6">
+            <div><b style="color:var(--chrome)">O que &eacute;:</b> um teto de watts que a placa pode puxar. N&atilde;o &eacute; overclock &mdash; voc&ecirc; n&atilde;o aumenta nada, s&oacute; limita o consumo.</div>
+            <div><b style="color:var(--chrome)">O que voc&ecirc; ganha:</b> menos calor, menos ru&iacute;do de ventoinha e menos energia da tomada. Em jogos leves, nada muda.</div>
+            <div><b style="color:var(--chrome)">O que voc&ecirc; paga:</b> em cenas pesadas os clocks caem um pouco pra respeitar o teto &mdash; normalmente poucos % de FPS. Se n&atilde;o gostar, volta pro padr&atilde;o em um clique.</div>
+            <div><b style="color:var(--chrome)">&Eacute; seguro?</b> Sim. Usa a via oficial do driver NVIDIA (nvidia-smi), n&atilde;o toca em tens&atilde;o e o pr&oacute;prio driver s&oacute; aceita valores dentro da faixa da placa.</div>
+            <div><b style="color:var(--chrome)">Rede de seguran&ccedil;a:</b> ao aplicar, voc&ecirc; tem <b style="color:var(--chrome)">15 segundos</b> pra confirmar que ficou est&aacute;vel &mdash; sen&atilde;o a Forja <b style="color:var(--chrome)">reverte sozinha</b>. E o bot&atilde;o &quot;Padr&atilde;o&quot; restaura o valor de f&aacute;brica quando quiser.</div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+            <button class="btn-ghost" id="pl-guide-close">Fechar</button>
+            <button class="btn-apply" id="pl-guide-ok">Entendi &mdash; liberar controles</button>
+          </div>
+        </div>
+      </div>
 
       <div class="foot-note">Power limit via nvidia-smi em espaço de usuário · nenhum driver de kernel · auto-reverte em 15s se não confirmar · nada é permanente.</div>
     </section>
@@ -1749,6 +1776,8 @@
     const dash = '—';
     const ts=new Date().toLocaleTimeString('pt-BR');
     const el=document.getElementById('ab-ts');if(el)el.textContent=ts;
+    // Eyebrow live: nome real da placa (era texto chumbado "RTX 3060 Ti").
+    setTxt('gpu-eyebrow', ok&&g.name ? g.name : 'GPU NVIDIA não detectada — telemetria e ajustes cobrem só NVIDIA (via oficial do driver)');
 
     const temp = ok && g.temp_c   !=null ? g.temp_c   : null;
     const core = ok && g.core_mhz !=null ? g.core_mhz : null;
@@ -1958,6 +1987,29 @@
     }
   });
   loadAutostart();
+
+  // ---- Power limit: gate educativo (blur até ler o guia, 1x por PC) ----
+  (function(){
+    const body=document.getElementById('pl-body'), lock=document.getElementById('pl-lock'),
+          guide=document.getElementById('pl-guide');
+    if(!body||!lock||!guide) return;
+    function setLocked(l){
+      body.style.filter=l?'blur(5px)':'';
+      body.style.pointerEvents=l?'none':'';
+      body.style.userSelect=l?'none':'';
+      lock.style.display=l?'flex':'none';
+    }
+    setLocked(localStorage.getItem('forge_pl_guide_ok')!=='1');
+    document.getElementById('pl-guide-open')?.addEventListener('click',()=>{guide.style.display='flex';});
+    document.getElementById('pl-guide-close')?.addEventListener('click',()=>{guide.style.display='none';});
+    guide.addEventListener('click',e=>{if(e.target===guide)guide.style.display='none';});
+    document.getElementById('pl-guide-ok')?.addEventListener('click',()=>{
+      localStorage.setItem('forge_pl_guide_ok','1');
+      guide.style.display='none';
+      setLocked(false);
+      showBanner('Controle de limite de energia liberado','ok');
+    });
+  })();
   document.getElementById('cfg-wizard')?.addEventListener('click',()=>fwOpen());
   document.getElementById('mon-cfg-btn')?.addEventListener('click',()=>window.showScreen&&window.showScreen('cfg'));
 
