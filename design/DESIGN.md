@@ -39,9 +39,16 @@ O **medidor térmico de score** — arco que esquenta conforme a nota sobe, com 
 - Elementos de confiança visíveis: badge "código aberto · zero telemetria" na sidebar, banner de transparência e diff antes/depois na tela Sistema.
 - Risco estético assumido: inverter o vermelho=ruim/verde=bom para a escala térmica frio→quente, coerente com a metáfora da forja. Vermelho (`danger`) reservado só pra ações destrutivas, onde ainda lê como perigo.
 
-## Pendências de design (próxima sessão)
-- Telas Hardware, Jogos, Monitor, Linha do tempo, Settings
-- Card antes/depois exportável (1200×630) pra compartilhar
+## Estado (v1.1.0)
+- Todas as telas construídas e vivas: Painel, Sistema, Hardware, GPU, Jogos, Monitor, Linha do tempo, **Ajustes**
+- Histórico REAL: daemon grava score em `%LOCALAPPDATA%\Forge\history.jsonl`, `GET /api/history`, gráficos gerados do dado
+- Card antes/depois exportável em PNG (1200×630, canvas puro) ✅
+- Wizard de boas-vindas ✅ (passo 4 usa detecção real de jogos)
+- Estados vazios/erro/"coletando" em todas as telas ✅
+- Conquistas computadas do estado real (não são mais prévia)
+- Ícones nos eyebrows dos painéis (`.pe-l`, 13px, stroke 1.7)
+
+## Pendências (próxima fase)
 - OSD em jogo (overlay)
-- Tela de boas-vindas / wizard do primeiro uso
-- Estados vazios e de erro
+- FPS + temperatura de CPU (LibreHardwareMonitor — Fase 2)
+- Undervolt / curva V/F / ventoinha via NVAPI (Fase 2, herda harness apply→testa→auto-reverte)

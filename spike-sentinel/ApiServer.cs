@@ -59,6 +59,11 @@ static class ApiServer
         }
         bool isAdmin = Elevation.IsAdmin();
 
+        // Um ponto de histórico no boot do serve: garante registro mesmo que a
+        // UI nunca abra nesta sessão (dedup interno evita poluição).
+        try { ScoreHistory.Record(ScoreEngine.Calculate(_baseline, SnapshotEngine.Take())); }
+        catch { /* best-effort */ }
+
         using var listener = new HttpListener();
         // Loopback IP literal, not "+"/"*": binds without elevation on Win7+.
         listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
@@ -142,6 +147,8 @@ static class ApiServer
                 ServeGpuPowerReset(res, isAdmin);
             else if (req.HttpMethod == "GET" && path == "/api/monitor")
                 ServeMonitor(res);
+            else if (req.HttpMethod == "GET" && path == "/api/history")
+                ServeHistory(res);
             else if (req.HttpMethod == "GET" && path == "/api/games")
                 ServeGames(res);
             else if (req.HttpMethod == "POST" && path == "/api/baseline")
@@ -165,13 +172,21 @@ static class ApiServer
             h => string.Equals(h, host, StringComparison.OrdinalIgnoreCase));
     }
 
+    // Versão informada à UI (topbar/Sobre). Vem do csproj <Version>.
+    static readonly string AppVersion =
+        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+
     static void ServeStatus(HttpListenerResponse res, bool isAdmin)
     {
         var current = SnapshotEngine.Take();
         var baseline = _baseline ??= current;
         var r = ScoreEngine.Calculate(baseline, current);
+        // Cada leitura de status alimenta o histórico (dedup interno: só grava
+        // mudança de score ou batimento de 6h). É o que dá vida à tela Evolução.
+        ScoreHistory.Record(r);
         var json = JsonSerializer.Serialize(new
         {
+            version     = AppVersion,
             global      = r.Global,
             tier        = r.Tier,
             tier_color  = r.TierColor,
@@ -253,6 +268,13 @@ static class ApiServer
             });
         }
         return list;
+    }
+
+    // GET /api/history — pontos de score gravados localmente (JSONL). Read-only.
+    static void ServeHistory(HttpListenerResponse res)
+    {
+        res.ContentType = "application/json; charset=utf-8";
+        Close(res, ScoreHistory.Json());
     }
 
     // POST /api/baseline — capture current state as the Sentinel baseline (wizard finale).

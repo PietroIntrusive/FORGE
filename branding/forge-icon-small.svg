@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- FORGE app icon — variante para tamanhos pequenos (48/32/24/16 px).
+       Mesma linguagem do master, sem ornamento: bigorna maior, veia única grossa,
+       fundo mais quente. Legibilidade acima de fidelidade. -->
+  <defs>
+    <clipPath id="sq"><rect x="0" y="0" width="1024" height="1024" rx="210"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232329"/>
+      <stop offset=".55" stop-color="#141417"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
+    </linearGradient>
+    <radialGradient id="emberBed" cx=".5" cy="1" r=".9">
+      <stop offset="0" stop-color="#f97316" stop-opacity=".8"/>
+      <stop offset=".4" stop-color="#c2410c" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#b8442e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#585866"/>
+      <stop offset=".3" stop-color="#3a3a46"/>
+      <stop offset="1" stop-color="#202027"/>
+    </linearGradient>
+    <linearGradient id="magma" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset=".6" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#fff3c4"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fcd34d" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#f97316" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="bloom" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g clip-path="url(#sq)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#emberBed)"/>
+    <ellipse cx="560" cy="590" rx="400" ry="240" fill="url(#coreGlow)"/>
+
+    <!-- bigorna ampliada (escala ~1.3 do master, centrada) -->
+    <g transform="translate(512 540) scale(1.32) translate(-502 -552)">
+      <path d="M158 396 Q 246 352 332 344 L830 344 L846 362 L846 466 L830 484 L332 484 Q 250 434 158 396 Z" fill="url(#steel)"/>
+      <path d="M494 484 L716 484 L666 624 L546 624 Z" fill="url(#steel)"/>
+      <path d="M464 624 L746 624 L794 706 L416 706 Z" fill="url(#steel)"/>
+      <path d="M394 706 L816 706 L816 750 Q816 760 804 760 L406 760 Q394 760 394 750 Z" fill="url(#steel)"/>
+      <!-- aresta clara no topo: separa do fundo mesmo a 16px -->
+      <path d="M332 344 L830 344 L846 362 L348 362 Z" fill="#6b6b7c"/>
+      <path d="M158 396 Q 246 352 332 344 L332 362 Q 252 372 184 406 Z" fill="#5d5d6d"/>
+      <!-- veia única, grossa, atravessando a face -->
+      <g filter="url(#bloom)">
+        <path d="M350 442 L480 418 L560 452 L660 420 L790 440" fill="none" stroke="url(#magma)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M600 484 L588 560 L614 624" fill="none" stroke="url(#magma)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M508 668 L600 650 L700 668" fill="none" stroke="url(#magma)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+  </g>
+</svg>
