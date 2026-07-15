@@ -1094,6 +1094,14 @@
 
         <div style="display:flex;flex-direction:column;gap:18px">
           <div class="panel">
+            <div class="panel-eyebrow"><span class="pe-l"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>Inicialização</span></div>
+            <div class="toggle-row">
+              <div><div class="tl">Iniciar o motor com o Windows</div><div class="ts">Sobe o Sentinel no logon pra vigiar regressões. Desativado, a primeira abertura da Forja em cada sessão pede permissão do Windows (UAC).</div></div>
+              <button class="btn-ghost" id="cfg-autostart" disabled>—</button>
+            </div>
+            <div id="cfg-autostart-status" style="font-size:12px;color:var(--ash-dim);margin-top:8px;min-height:16px"></div>
+          </div>
+          <div class="panel">
             <div class="panel-eyebrow"><span class="pe-l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Assistente</span></div>
             <p style="font-size:13px;color:var(--ash);margin:0 0 14px;line-height:1.5">Refaça o tour de boas-vindas — retrato do PC, RAM/XMP, privacidade e baseline.</p>
             <button class="btn-ghost" id="cfg-wizard">Reabrir assistente</button>
@@ -1102,8 +1110,8 @@
             <div class="panel-eyebrow"><span class="pe-l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Sobre</span></div>
             <div class="fw-stat"><span class="k">Versão</span><span class="v" id="cfg-version">—</span></div>
             <div class="fw-stat"><span class="k">Telemetria</span><span class="v" style="color:#6ee7a8">Zero — nada sai do PC</span></div>
-            <div class="fw-stat"><span class="k">Código</span><span class="v" style="font-family:var(--f-mono);font-size:12.5px">github.com/pietro/forge</span></div>
-            <div class="fw-stat"><span class="k">Licença</span><span class="v">Open source</span></div>
+            <div class="fw-stat"><span class="k">Código</span><span class="v" style="font-family:var(--f-mono);font-size:12.5px">github.com/PietroIntrusive/FORGE</span></div>
+            <div class="fw-stat"><span class="k">Licença</span><span class="v">Proprietária · beta gratuito</span></div>
           </div>
         </div>
       </div>
@@ -1912,6 +1920,44 @@
     cfgPopulate();evaluateAlerts();
     const st=document.getElementById('cfg-status');if(st)st.textContent='Padrões restaurados.';
   });
+
+  // ---- Ajustes: iniciar o motor com o Windows (tarefa de logon) ----
+  // Transparência: o estado vem do sistema (schtasks via daemon), nunca de um
+  // chute; toda mudança confirma visualmente o resultado real.
+  function paintAutostart(on){
+    const b=document.getElementById('cfg-autostart'); if(!b) return;
+    b.disabled=false;
+    b.dataset.on=on?'1':'';
+    b.textContent=on?'Ativado · desativar':'Desativado · ativar';
+    b.style.color=on?'#6ee7a8':'';
+  }
+  function loadAutostart(){
+    fetch(BASE+'/api/autostart',{signal:AbortSignal.timeout(5000)}).then(r=>r.json())
+      .then(j=>{ if(j&&typeof j.enabled==='boolean') paintAutostart(j.enabled); })
+      .catch(()=>{});
+  }
+  document.getElementById('cfg-autostart')?.addEventListener('click',async()=>{
+    const b=document.getElementById('cfg-autostart'), st=document.getElementById('cfg-autostart-status');
+    const want=!b.dataset.on;
+    b.disabled=true; if(st){st.style.color='var(--ash-dim)';st.textContent='Aplicando…';}
+    try{
+      const r=await fetch(BASE+'/api/autostart',{method:'POST',
+        headers:{'Security-Token':TOKEN,'Content-Type':'application/json'},
+        body:JSON.stringify({on:want}),signal:AbortSignal.timeout(15000)});
+      const j=await r.json();
+      paintAutostart(!!j.enabled);
+      if(st){
+        st.style.color=j.ok?'#6ee7a8':'#f59e0b';
+        st.textContent=j.ok
+          ?(j.enabled?'✓ O motor sobe junto com o Windows.':'✓ Desativado — a Forja vai pedir UAC uma vez por sessão pra subir o motor.')
+          :(j.message||j.error||'Não consegui alterar.');
+      }
+    }catch(e){
+      if(st){st.style.color='#f59e0b';st.textContent='Falha ao falar com o daemon.';}
+      b.disabled=false;
+    }
+  });
+  loadAutostart();
   document.getElementById('cfg-wizard')?.addEventListener('click',()=>fwOpen());
   document.getElementById('mon-cfg-btn')?.addEventListener('click',()=>window.showScreen&&window.showScreen('cfg'));
 
@@ -1986,22 +2032,24 @@
     }
     const tb=document.getElementById('hw-disk-body');
     if(tb){
-      if(!ok||!s.disks||!s.disks.length) tb.innerHTML='<tr><td colspan="6" style="padding:13px 0;color:var(--ash-dim)">Sem dados de disco</td></tr>';
-      else tb.innerHTML=s.disks.map(d=>{
+      // Regra: seção nunca regride. Falha momentânea mantém a última leitura;
+      // "Sem dados" só antes da primeira pintura (beta: tabela sumia em jogo).
+      if(!ok||!s.disks||!s.disks.length){ if(!tb.dataset.filled) tb.innerHTML='<tr><td colspan="6" style="padding:13px 0;color:var(--ash-dim)">Sem dados de disco</td></tr>'; }
+      else { tb.dataset.filled='1'; tb.innerHTML=s.disks.map(d=>{
         const ty=diskType(d), tyc=/nvme/i.test(ty)?'var(--hot)':(/hdd/i.test(ty)?'var(--ash-dim)':'var(--chrome)');
         const usage=(d.used!=null&&d.size)?tib(d.used)+' / '+tib(d.size):tib(d.size);
         const healthy=/healthy/i.test(d.health||''), hl=healthy?'100% — Ótimo':(d.health||'—'), hc=healthy?'#6ee7a8':'#f59e0b';
         const tp=d.temp!=null?d.temp+'°C':'—';
         return '<tr style="border-top:1px solid var(--edge-soft)"><td style="padding:13px 14px 13px 0;font-weight:500">'+(d.model||'—')+'</td><td style="padding:13px 14px 13px 0;font-family:var(--f-mono);font-size:12px;color:'+tyc+'">'+ty+'</td><td style="padding:13px 14px 13px 0;color:var(--ash)">'+tib(d.size)+'</td><td style="padding:13px 14px 13px 0;color:var(--ash)">'+usage+'</td><td style="padding:13px 14px 13px 0"><span style="color:'+hc+';font-family:var(--f-mono);font-size:12px">'+hl+'</span></td><td style="padding:13px 0;font-family:var(--f-mono)">'+tp+'</td></tr>';
-      }).join('');
+      }).join(''); }
     }
     const pl=document.getElementById('mon-proc-list');
     if(pl){
-      if(!ok||!s.procs||!s.procs.length) pl.innerHTML='<div class="proc-row"><span class="proc-name" style="color:var(--ash-dim)">Sem dados</span><span class="proc-val">—</span><span class="proc-val">—</span><span class="proc-val">—</span></div>';
-      else pl.innerHTML=s.procs.map(p=>{
+      if(!ok||!s.procs||!s.procs.length){ if(!pl.dataset.filled) pl.innerHTML='<div class="proc-row"><span class="proc-name" style="color:var(--ash-dim)">Sem dados</span><span class="proc-val">—</span><span class="proc-val">—</span><span class="proc-val">—</span></div>'; }
+      else { pl.dataset.filled='1'; pl.innerHTML=s.procs.map(p=>{
         const cpu=p.cpu!=null?p.cpu+'%':'—', hi=p.cpu>=20?' hi':'';
         return '<div class="proc-row"><span class="proc-name">'+p.name+'</span><span class="proc-val'+hi+'">'+cpu+'</span><span class="proc-val">'+fmtRam(p.ram)+'</span><span class="proc-val" title="GPU por processo: requer captura em jogo">—</span></div>';
-      }).join('');
+      }).join(''); }
     }
   }
   function tickSys(){ fetch(BASE+'/api/monitor',{signal:AbortSignal.timeout(7000)}).then(r=>r.json()).then(paintSys).catch(()=>paintSys(null)); }

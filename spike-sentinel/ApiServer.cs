@@ -64,6 +64,10 @@ static class ApiServer
         try { ScoreHistory.Record(ScoreEngine.Calculate(_baseline, SnapshotEngine.Take())); }
         catch { /* best-effort */ }
 
+        // Abre a query PDH e dispara a primeira carga do cache frio (specs/discos)
+        // antes do primeiro poll da UI — o caminho quente nunca spawna PowerShell.
+        SystemTelemetry.PrimeAtStartup();
+
         using var listener = new HttpListener();
         // Loopback IP literal, not "+"/"*": binds without elevation on Win7+.
         listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
@@ -153,6 +157,10 @@ static class ApiServer
                 ServeGames(res);
             else if (req.HttpMethod == "POST" && path == "/api/baseline")
                 ServeBaseline(req, res, isAdmin);
+            else if (req.HttpMethod == "GET" && path == "/api/autostart")
+                ServeAutostartGet(res);
+            else if (req.HttpMethod == "POST" && path == "/api/autostart")
+                ServeAutostartSet(req, res, isAdmin);
             else
             {
                 res.StatusCode = 404;
@@ -353,7 +361,7 @@ static class ApiServer
         }
     }
 
-    static string RunPs(string script)
+    internal static string RunPs(string script)
     {
         var psi = new ProcessStartInfo("powershell",
             "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script.Replace("\"", "\\\"") + "\"")
@@ -366,9 +374,15 @@ static class ApiServer
             StandardOutputEncoding = Encoding.UTF8,
         };
         using var p = Process.Start(psi)!;
-        string outp = p.StandardOutput.ReadToEnd();
-        p.WaitForExit(8000);
-        return outp;
+        // Leitura assíncrona + teto de espera com KILL: um PowerShell pendurado
+        // morre em vez de acumular (beta viu powershell.exe empilhando em jogo).
+        var read = p.StandardOutput.ReadToEndAsync();
+        if (!p.WaitForExit(8000))
+        {
+            try { p.Kill(entireProcessTree: true); } catch { /* já saiu */ }
+            return "";
+        }
+        return read.GetAwaiter().GetResult();
     }
 
     // GET /api/gpu — live GPU telemetry (temp, clocks, util, vram, power, fan) straight
@@ -455,52 +469,91 @@ static class ApiServer
         Close(res, JsonSerializer.Serialize(new { ok = r.Ok, applied = (int)r.Applied, message = r.Message }));
     }
 
-    // One PowerShell/CIM pass for the live system monitor: CPU (name/cores/threads/load),
-    // RAM (total/free), physical disks (model/media/bus/size/used/health/temp), and the top
-    // processes by working set (with per-process CPU%). CIM perf classes are used instead of
-    // Get-Counter so the property names are locale-independent — Get-Counter's paths are
-    // TRANSLATED on a pt-BR Windows and would silently break. Single-quoted throughout: it's
-    // passed through RunPs's double-quoted -Command, so no embedded double quotes allowed.
-    const string MonitorScript =
-        "$ErrorActionPreference='SilentlyContinue';" +
-        "$os=Get-CimInstance Win32_OperatingSystem;" +
-        "$cp=Get-CimInstance Win32_Processor|Select-Object -First 1;" +
-        "$prc=Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor;" +
-        "$ld=($prc|Where-Object {$_.Name -eq '_Total'}).PercentProcessorTime;" +
-        // Per-core load: instâncias numeradas (0,1,2…), ordenadas, viram array de %.
-        "$cores=@($prc|Where-Object {$_.Name -ne '_Total'}|Sort-Object {[int]$_.Name}|ForEach-Object {[int]$_.PercentProcessorTime});" +
-        // Throughput agregado de disco (_Total): bytes/s lidos e escritos.
-        "$iot=Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk|Where-Object {$_.Name -eq '_Total'}|Select-Object -First 1;" +
-        "$lp=[int]$cp.NumberOfLogicalProcessors;if($lp -lt 1){$lp=1};" +
-        "$pf=@{};Get-CimInstance Win32_PerfFormattedData_PerfProc_Process|ForEach-Object {$pf[[int]$_.IDProcess]=[int]$_.PercentProcessorTime};" +
-        "$dk=Get-PhysicalDisk|ForEach-Object {" +
-            "$rt=$null;try{$rt=($_|Get-StorageReliabilityCounter).Temperature}catch{};" +
-            "$dn=[int]$_.DeviceId;$us=$null;" +
-            "try{$vs=Get-Partition -DiskNumber $dn|Get-Volume;$us=([int64](($vs|Measure-Object -Property Size -Sum).Sum))-([int64](($vs|Measure-Object -Property SizeRemaining -Sum).Sum))}catch{};" +
-            "[pscustomobject]@{model=$_.FriendlyName;media=[string]$_.MediaType;bus=[string]$_.BusType;size=[int64]$_.Size;used=$us;health=[string]$_.HealthStatus;temp=$rt}};" +
-        "$pr=Get-Process|Sort-Object -Descending WorkingSet64|Select-Object -First 6|ForEach-Object {" +
-            "$c=0;if($pf.ContainsKey($_.Id)){$c=[int][math]::Round($pf[$_.Id]/$lp)};" +
-            "[pscustomobject]@{name=$_.ProcessName;ram=[int64]$_.WorkingSet64;cpu=$c}};" +
-        "[pscustomobject]@{" +
-            "cpu=[pscustomobject]@{name=[string]$cp.Name;cores=[int]$cp.NumberOfCores;threads=$lp;load=[int]$ld;per_core=$cores};" +
-            "ram=[pscustomobject]@{total_kb=[int64]$os.TotalVisibleMemorySize;free_kb=[int64]$os.FreePhysicalMemory};" +
-            "io=[pscustomobject]@{read_bps=[int64]$iot.DiskReadBytesPersec;write_bps=[int64]$iot.DiskWriteBytesPersec};" +
-            "disks=@($dk);procs=@($pr)}|ConvertTo-Json -Depth 5 -Compress";
-
     // GET /api/monitor — live CPU/RAM/disk/process telemetry. Read-only; no gating. The UI
     // polls this; available=false (or any field absent) makes the UI show "—" rather than
-    // invent numbers.
+    // invent numbers. Hot metrics are in-process (SystemTelemetry/PDH); the old
+    // per-poll PowerShell pass piled up powershell.exe under game load.
     static void ServeMonitor(HttpListenerResponse res)
     {
         res.ContentType = "application/json; charset=utf-8";
+        try { Close(res, SystemTelemetry.MonitorJson()); }
+        catch { Close(res, "{\"available\":false}"); }
+    }
+
+    // ---- Autostart do motor (tarefa de logon ForgeSentinel) ---------------------
+    // Confiança > conveniência: iniciar com o Windows é escolha visível do usuário
+    // (checkbox no instalador + este toggle em Ajustes), nunca um fato consumado.
+    // GET  /api/autostart      → {enabled} — a tarefa de logon existe?
+    // POST /api/autostart {on} → cria/remove a tarefa. Mesmo gate das mutações
+    // (token + admin). Ação de id fixo: nenhum valor do cliente entra no comando —
+    // o caminho do exe vem do próprio processo.
+    const string LogonTaskName = "ForgeSentinel";
+
+    static bool AutostartEnabled() =>
+        RunExe("schtasks", $"/query /tn {LogonTaskName}").Code == 0;
+
+    static void ServeAutostartGet(HttpListenerResponse res)
+    {
+        res.ContentType = "application/json; charset=utf-8";
+        Close(res, JsonSerializer.Serialize(new { enabled = AutostartEnabled() }));
+    }
+
+    static void ServeAutostartSet(HttpListenerRequest req, HttpListenerResponse res, bool isAdmin)
+    {
+        res.ContentType = "application/json; charset=utf-8";
+        if (!MutationAllowed(req, res, isAdmin)) return;
+
+        bool on;
         try
         {
-            var raw = RunPs(MonitorScript).Trim();
-            if (raw.Length == 0) { Close(res, "{\"available\":false}"); return; }
-            using var _ = JsonDocument.Parse(raw); // reject malformed output
-            Close(res, "{\"available\":true,\"sys\":" + raw + "}");
+            using var doc = JsonDocument.Parse(ReadBody(req));
+            on = doc.RootElement.GetProperty("on").GetBoolean();
         }
-        catch { Close(res, "{\"available\":false}"); }
+        catch
+        {
+            res.StatusCode = 400;
+            Close(res, "{\"error\":\"esperado {\\\"on\\\":bool}\"}");
+            return;
+        }
+
+        int code;
+        if (on)
+        {
+            var exe = Path.Combine(AppContext.BaseDirectory, "ForgeSentinel.exe");
+            code = RunExe("schtasks",
+                $"/create /f /tn {LogonTaskName} /tr \"\\\"{exe}\\\" serve\" /sc onlogon /rl highest").Code;
+        }
+        else
+            code = RunExe("schtasks", $"/delete /f /tn {LogonTaskName}").Code;
+
+        var enabled = AutostartEnabled();
+        var ok = code == 0 && enabled == on;
+        Close(res, JsonSerializer.Serialize(new
+        {
+            ok,
+            enabled,
+            message = ok ? null : "schtasks recusou a alteração.",
+        }));
+    }
+
+    // Executável nativo com teto de espera e KILL no estouro — mesma disciplina
+    // do RunPs: processo pendurado morre, não acumula.
+    static (int Code, string Out) RunExe(string exe, string args)
+    {
+        var psi = new ProcessStartInfo(exe, args)
+        {
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        using var p = Process.Start(psi)!;
+        var read = p.StandardOutput.ReadToEndAsync();
+        if (!p.WaitForExit(8000))
+        {
+            try { p.Kill(entireProcessTree: true); } catch { /* já saiu */ }
+            return (-1, "");
+        }
+        return (p.ExitCode, read.GetAwaiter().GetResult());
     }
 
     // Real game detection: Steam (registry SteamPath → libraryfolders.vdf → appmanifest_*.acf)
