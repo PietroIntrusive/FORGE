@@ -50,6 +50,11 @@ static class GpuReader
 
     public static GpuInfo Read()
     {
+        // Caminho quente: NVML in-process (zero subprocess). nvidia-smi abaixo
+        // vira só fallback pra quando a dll não carrega.
+        var viaNvml = NvmlGpu.TryRead();
+        if (viaNvml is not null) return viaNvml;
+
         var exe = Array.Find(Candidates, c => c == "nvidia-smi" || File.Exists(c));
         if (exe is null) return None;
 
@@ -66,9 +71,13 @@ static class GpuReader
 
             using var p = Process.Start(psi);
             if (p is null) return None;
-            string outp = p.StandardOutput.ReadToEnd();
+            // Leitura ASSÍNCRONA antes do wait: ReadToEnd síncrono bloqueava a
+            // thread se o nvidia-smi travasse sob carga — o kill nunca rodava e
+            // os processos acumulavam (beta v1.1.x, junto com os powershell).
+            var read = p.StandardOutput.ReadToEndAsync();
             if (!p.WaitForExit(5000)) { try { p.Kill(true); } catch { } return None; }
             if (p.ExitCode != 0) return None;
+            string outp = read.GetAwaiter().GetResult();
 
             // First non-empty line = the primary GPU. (Multi-GPU rigs report one line each;
             // the dashboard shows the primary, matching the single-card design.)
@@ -116,9 +125,11 @@ static class GpuReader
             foreach (var a in args) psi.ArgumentList.Add(a);
             using var p = Process.Start(psi);
             if (p is null) return (-1, "");
-            string outp = p.StandardOutput.ReadToEnd();
+            // Mesmo idioma do Read(): leitura assíncrona + wait com kill, pra
+            // nvidia-smi pendurado nunca acumular.
+            var read = p.StandardOutput.ReadToEndAsync();
             if (!p.WaitForExit(8000)) { try { p.Kill(true); } catch { } return (-1, ""); }
-            return (p.ExitCode, outp);
+            return (p.ExitCode, read.GetAwaiter().GetResult());
         }
         catch { return (-1, ""); }
     }

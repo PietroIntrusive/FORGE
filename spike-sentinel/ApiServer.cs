@@ -489,6 +489,8 @@ static class ApiServer
 
     // Assinaturas exclusivas dos scripts de telemetria/jogos das versões antigas
     // (e dos passes frios atuais, cobertos pela idade mínima de 2 minutos).
+    // nvidia-smi entra na mesma vassoura: leitura saudável dura <1s, então
+    // query-gpu com >2min de vida = processo preso da versão antiga.
     const string ZombieSweepScript =
         "$ErrorActionPreference='SilentlyContinue';" +
         "$cut=(Get-Date).AddMinutes(-2);" +
@@ -496,6 +498,9 @@ static class ApiServer
         "Where-Object {$_.ProcessId -ne $PID -and " +
             "$_.CommandLine -match 'Win32_PerfFormattedData|StorageReliabilityCounter|libraryfolders' -and " +
             "$_.CreationDate -lt $cut}|" +
+        "ForEach-Object {Stop-Process -Id $_.ProcessId -Force};" +
+        "Get-CimInstance Win32_Process -Filter 'Name=''nvidia-smi.exe''' |" +
+        "Where-Object {$_.CommandLine -match 'query-gpu' -and $_.CreationDate -lt $cut}|" +
         "ForEach-Object {Stop-Process -Id $_.ProcessId -Force}";
 
     // ---- Autostart do motor (tarefa de logon ForgeSentinel) ---------------------
