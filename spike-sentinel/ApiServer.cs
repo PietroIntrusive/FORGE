@@ -168,6 +168,10 @@ static class ApiServer
                 ServeAutostartGet(res);
             else if (req.HttpMethod == "POST" && path == "/api/autostart")
                 ServeAutostartSet(req, res, isAdmin);
+            else if (req.HttpMethod == "GET" && path == "/api/undo")
+                ServeUndoDry(res);
+            else if (req.HttpMethod == "POST" && path == "/api/undo")
+                ServeUndo(req, res, isAdmin);
             else
             {
                 res.StatusCode = 404;
@@ -502,6 +506,48 @@ static class ApiServer
         "Get-CimInstance Win32_Process -Filter 'Name=''nvidia-smi.exe''' |" +
         "Where-Object {$_.CommandLine -match 'query-gpu' -and $_.CreationDate -lt $cut}|" +
         "ForEach-Object {Stop-Process -Id $_.ProcessId -Force}";
+
+    // ---- Desfazer: undo do último batch de mutação, agora com botão na UI -------
+    // GET  /api/undo  → dry-run read-only: o que seria desfeito (pinta o botão).
+    // POST /api/undo  → desfaz o último batch "restore"/"apply" (gate token+admin).
+    // Mesmo caminho do CLI `undo`: reverte pelos RawBefore auditados no fix_log,
+    // e o próprio undo entra no log como novo batch.
+    static IGrouping<string, FixLogEntry>? LastMutationBatch() =>
+        FixLog.Load().Where(e => e.Action is "restore" or "apply")
+              .GroupBy(e => e.BatchId).LastOrDefault();
+
+    static void ServeUndoDry(HttpListenerResponse res)
+    {
+        res.ContentType = "application/json; charset=utf-8";
+        var batch = LastMutationBatch();
+        if (batch is null) { Close(res, "{\"available\":false,\"count\":0}"); return; }
+        var items = batch.Select(e => new { setting = e.Setting, from = e.AfterLabel, to = e.BeforeLabel }).ToArray();
+        Close(res, JsonSerializer.Serialize(new { available = true, count = items.Length, items }));
+    }
+
+    static void ServeUndo(HttpListenerRequest req, HttpListenerResponse res, bool isAdmin)
+    {
+        res.ContentType = "application/json; charset=utf-8";
+        if (!MutationAllowed(req, res, isAdmin)) return;
+
+        var batch = LastMutationBatch();
+        if (batch is null) { Close(res, "{\"ok\":true,\"undone\":0,\"total\":0}"); return; }
+
+        var entries = batch.ToList();
+        var batchId = Guid.NewGuid().ToString("N");
+        int ok = 0;
+        foreach (var e in entries)
+        {
+            if (RestoreEngine.ApplyRaw(e.Kind, e.RawBefore))
+            {
+                ok++;
+                FixLog.Append(new FixLogEntry(
+                    DateTime.UtcNow, batchId, "undo", e.Kind, e.Setting,
+                    e.RawAfter, e.RawBefore, e.AfterLabel, e.BeforeLabel, $"undo de {e.Detail}"));
+            }
+        }
+        Close(res, JsonSerializer.Serialize(new { ok = ok == entries.Count, undone = ok, total = entries.Count }));
+    }
 
     // ---- Autostart do motor (tarefa de logon ForgeSentinel) ---------------------
     // Confiança > conveniência: iniciar com o Windows é escolha visível do usuário

@@ -561,6 +561,11 @@
             <div id="dash-fix-actions" style="margin-top:14px;display:none;justify-content:flex-end">
               <button class="fix-all"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg> Forjar tudo</button>
             </div>
+            <!-- Desfazer sempre visível (some só sem histórico): o arrependimento
+                 vem justamente quando "tudo forjado" escondeu a linha de ações. -->
+            <div style="margin-top:8px;display:flex;justify-content:flex-end">
+              <button class="mini-btn" data-undo disabled style="opacity:.85">Desfazer</button>
+            </div>
           </div>
 
           <!-- Timeline: desenhada de /api/history (real). Badge "coletando" enquanto <2 pontos. -->
@@ -722,7 +727,8 @@
 
       <div class="trust-banner">
         <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
-        <div><div class="t">Nada acontece sem você ver</div><div class="s">Cada ajuste mostra o valor antes e depois. Tudo fica registrado e pode ser revertido a qualquer momento.</div></div>
+        <div style="flex:1"><div class="t">Nada acontece sem você ver</div><div class="s">Cada ajuste mostra o valor antes e depois. Tudo fica registrado e pode ser revertido a qualquer momento.</div></div>
+        <button class="btn-ghost" data-undo disabled style="white-space:nowrap">Desfazer última aplicação</button>
       </div>
 
       <!-- Renderizado ao vivo de /api/status → tasks (só as `needed` no SEU PC).
@@ -1334,12 +1340,16 @@
   // ---- Central de Correções: cards reais, vindos de /api/status → tasks ----
   // Renderiza SÓ as tarefas com needed=true (estado real do PC ≠ alvo). Zero estático.
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  // Mapa id→task da última renderização: alimenta a confirmação em dois passos
+  // dos ajustes críticos (ex.: telemetria) sem depender do DOM.
+  let TASKMAP={};
   function renderTasks(tasks){
     const list=document.getElementById('fix-list');
     const empty=document.getElementById('fix-empty');
     const sub=document.querySelector('#sys .page-sub');
     if(!list) return;
     const needed=Array.isArray(tasks)?tasks.filter(t=>t&&t.needed):[];
+    TASKMAP={};needed.forEach(t=>{TASKMAP[t.id]=t;});
     renderDashTasks(needed);          // Painel: mesma fonte viva que a tela Sistema
     updateNavBadge(needed.length);    // badge do sidebar reflete o real, some no zero
     if(needed.length===0){
@@ -1461,6 +1471,7 @@
       else showBanner(`${d.applied}/${d.total} aplicado(s) com sucesso`,'ok');
       // refresh score
       fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+      paintUndo();
     }catch{
       showBanner('Daemon offline — rode: ForgeSentinel serve','err');
     }
@@ -1483,14 +1494,48 @@
       if(status===403) showBanner('Admin necessário — reinicie: ForgeSentinel serve (como Administrador)','err');
       else if(status===400) showBanner('Ação desconhecida','err');
       else if(data.already) showBanner('Já está no ponto — nada a forjar','ok');
-      else if(data.applied>0) showBanner('Otimização aplicada — reversível pelo histórico','ok');
+      else if(data.applied>0) showBanner('✓ Aplicado — dá pra desfazer no botão "Desfazer última aplicação"','ok');
       else showBanner('Não foi possível aplicar','err');
       fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+      paintUndo();
     }catch{
       showBanner('Daemon offline — rode: ForgeSentinel serve','err');
     }
     btn.disabled=false;btn.style.opacity='';btn.innerHTML=orig;
   }
+  // ---- Desfazer última aplicação: /api/undo (dry no GET pinta o botão) ----
+  function paintUndo(){
+    fetch(BASE+'/api/undo',{signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(j=>{
+      document.querySelectorAll('[data-undo]').forEach(b=>{
+        if(j&&j.available){
+          b.disabled=false;
+          b.title=j.count+' alteração(ões) do último lote voltam ao estado anterior';
+        }else{
+          b.disabled=true;
+          b.title='Nenhuma alteração da Forja pra reverter';
+        }
+      });
+    }).catch(()=>{});
+  }
+  async function doUndo(btn){
+    const orig=btn.textContent;
+    btn.disabled=true;btn.style.opacity='.5';btn.textContent='Desfazendo…';
+    try{
+      const r=await fetch(BASE+'/api/undo',{method:'POST',
+        headers:{'Security-Token':TOKEN},signal:AbortSignal.timeout(15000)});
+      const d=await r.json().catch(()=>({}));
+      if(r.status===403) showBanner('Admin necessário — reinicie a Forja como Administrador','err');
+      else if(d.total===0) showBanner('Nada para desfazer','ok');
+      else if(d.ok) showBanner(`✓ Desfeito — ${d.undone} configuração(ões) voltaram ao estado anterior`,'ok');
+      else showBanner(`Desfeito parcialmente: ${d.undone}/${d.total}`,'err');
+      fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+    }catch{
+      showBanner('Daemon offline — abra a Forja de novo','err');
+    }
+    btn.style.opacity='';btn.textContent=orig;
+    paintUndo();
+  }
+
   // "Sopro da Forja" / "Forjar tudo": aplica o conjunto seguro inteiro de uma vez.
   // Server-side atômico (/api/quick): UM ponto de restauração e UM batch de auditoria,
   // então um único `undo` reverte o sopro completo. Sem botão (btn opcional) pode ser
@@ -1503,10 +1548,11 @@
         headers:{'Security-Token':TOKEN},signal:AbortSignal.timeout(15000)});
       const d=await r.json().catch(()=>({}));
       if(r.status===403) showBanner('Admin necessário — reinicie a Forja como Administrador','err');
-      else if(d.applied>0) showBanner(`Sopro da Forja: ${d.applied} otimização(ões) aplicada(s) — reversível`,'ok');
+      else if(d.applied>0) showBanner(`Sopro da Forja: ${d.applied} otimização(ões) aplicada(s) — um Desfazer reverte tudo`,'ok');
       else if(d.already>0 && d.applied===0) showBanner('Tudo já no ponto — a forja está quente','ok');
       else showBanner('Nada a forjar','ok');
       fetch(API,{signal:AbortSignal.timeout(2000)}).then(r=>r.json()).then(apply).catch(()=>{});
+      paintUndo();
     }catch{
       showBanner('Daemon offline — rode: ForgeSentinel serve','err');
     }
@@ -1714,8 +1760,29 @@
     // Central de Correções renderizados ao vivo (innerHTML não dispara binding direto).
     document.addEventListener('click',e=>{
       const b=e.target.closest('.mini-btn[data-apply]');
-      if(b) doApply(b,b.dataset.apply);
+      if(!b) return;
+      // Ajuste crítico (ex.: telemetria): dois passos. 1º clique explica o que
+      // muda e arma "Tem certeza?"; 2º clique em 8s aplica. Sem clique, desarma.
+      const t=TASKMAP[b.dataset.apply];
+      if(t&&t.sev==='crit'&&b.dataset.sure!=='1'){
+        if(!b.dataset.lbl) b.dataset.lbl=b.textContent;
+        b.dataset.sure='1';
+        b.textContent='Tem certeza?';
+        b.style.background='rgba(212,84,58,.28)';
+        showBanner((t.why||t.title)+' — reversível pelo botão Desfazer. Clique de novo para confirmar.','err');
+        clearTimeout(b._sureT);
+        b._sureT=setTimeout(()=>{if(b.isConnected){b.dataset.sure='';b.textContent=b.dataset.lbl;b.style.background='';}},8000);
+        return;
+      }
+      if(b.dataset.lbl){b.dataset.sure='';b.style.background='';}
+      doApply(b,b.dataset.apply);
     });
+    // Desfazer última aplicação (todos os botões [data-undo])
+    document.addEventListener('click',e=>{
+      const b=e.target.closest('[data-undo]');
+      if(b&&!b.disabled) doUndo(b);
+    });
+    paintUndo();
     // "Forjar tudo" → Sopro da Forja: aplica o conjunto seguro inteiro, atômico.
     document.querySelector('.fix-all')?.addEventListener('click',function(){forgeQuick(this);});
     // Restore-to-baseline: SÓ no botão dedicado da linha de regressão do Sentinel.
